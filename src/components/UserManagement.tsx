@@ -1,41 +1,47 @@
-import React, { useState, useRef } from 'react';
-import { UserPlus, X, Upload } from 'lucide-react';
-import type { User } from '../types';
+import React, { useRef, useState } from "react";
+import { UserPlus, X, Upload } from "lucide-react";
+import { useAuth } from "../contexts/AuthContext";
+import { useUsers } from "../hooks/useUsers";
 
-interface UserManagementProps {
-  users: User[];
-  onAddUser: (name: string, avatar?: string) => void;
-  onRemoveUser: (id: string) => void;
-}
-
-export function UserManagement({ users, onAddUser, onRemoveUser }: UserManagementProps) {
-  const [newUserName, setNewUserName] = useState('');
-  const [previewUrl, setPreviewUrl] = useState<string | null>(null);
+export function UserManagement() {
+  const { user: authUser } = useAuth();
+  const { users, createUser, deleteUser, isCreating, isDeleting } = useUsers();
+  const [newUserName, setNewUserName] = useState("");
   const fileInputRef = useRef<HTMLInputElement>(null);
 
-  const handleAddUser = () => {
-    if (newUserName.trim()) {
-      onAddUser(newUserName.trim(), previewUrl || undefined);
-      setNewUserName('');
-      setPreviewUrl(null);
+  const handleAddUser = async () => {
+    if (!authUser || !newUserName.trim() || isCreating) return;
+
+    try {
+      const file = fileInputRef.current?.files?.[0];
+      await createUser({
+        name: newUserName.trim(),
+        authId: authUser.id,
+        avatarFile: file,
+      });
+      setNewUserName("");
+      if (fileInputRef.current) {
+        fileInputRef.current.value = "";
+      }
+    } catch (error) {
+      console.error("Error creating user:", error);
     }
   };
 
-  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (file) {
-      const reader = new FileReader();
-      reader.onloadend = () => {
-        setPreviewUrl(reader.result as string);
-      };
-      reader.readAsDataURL(file);
+  const handleRemoveUser = async (id: string) => {
+    if (!isDeleting) {
+      try {
+        await deleteUser(id);
+      } catch (error) {
+        console.error("Error removing user:", error);
+      }
     }
   };
 
   return (
     <div className="p-4">
       <h2 className="text-lg font-semibold mb-4">Team Members</h2>
-      
+
       <div className="space-y-4">
         <div className="flex gap-2">
           <div className="flex-1 space-y-2">
@@ -45,42 +51,33 @@ export function UserManagement({ users, onAddUser, onRemoveUser }: UserManagemen
               onChange={(e) => setNewUserName(e.target.value)}
               placeholder="Enter team member name..."
               className="w-full px-3 py-1.5 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500"
-              onKeyPress={(e) => {
-                if (e.key === 'Enter') {
-                  handleAddUser();
-                }
-              }}
+              disabled={isCreating}
             />
             <div className="flex items-center gap-2">
               <input
                 type="file"
                 ref={fileInputRef}
-                onChange={handleFileChange}
                 accept="image/*"
                 className="hidden"
+                disabled={isCreating}
               />
               <button
                 onClick={() => fileInputRef.current?.click()}
-                className="flex items-center gap-2 px-3 py-1.5 text-sm border border-gray-300 rounded hover:bg-gray-50"
+                className="flex items-center gap-2 px-3 py-1.5 text-sm border border-gray-300 rounded hover:bg-gray-50 disabled:opacity-50"
+                disabled={isCreating}
               >
                 <Upload size={16} />
                 Upload Avatar
               </button>
-              {previewUrl && (
-                <img
-                  src={previewUrl}
-                  alt="Preview"
-                  className="w-8 h-8 rounded-full object-cover"
-                />
-              )}
             </div>
           </div>
           <button
             onClick={handleAddUser}
-            className="flex items-center gap-2 px-3 py-1.5 bg-blue-500 text-white rounded hover:bg-blue-600 transition-colors"
+            disabled={isCreating}
+            className="flex items-center gap-2 px-3 py-1.5 bg-blue-500 text-white rounded hover:bg-blue-600 transition-colors disabled:opacity-50"
           >
             <UserPlus size={18} />
-            Add
+            {isCreating ? "Adding..." : "Add"}
           </button>
         </div>
 
@@ -103,8 +100,9 @@ export function UserManagement({ users, onAddUser, onRemoveUser }: UserManagemen
               )}
               <span>{user.name}</span>
               <button
-                onClick={() => onRemoveUser(user.id)}
-                className="text-gray-400 hover:text-red-500"
+                onClick={() => handleRemoveUser(user.id)}
+                disabled={isDeleting}
+                className="text-gray-400 hover:text-red-500 disabled:opacity-50"
               >
                 <X size={14} />
               </button>

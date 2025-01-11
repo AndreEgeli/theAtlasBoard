@@ -1,48 +1,41 @@
-import React, { useState } from 'react';
-import { Tag } from 'lucide-react';
-import type { Tag as TagType } from '../types';
+import React, { useState } from "react";
+import { Tag } from "lucide-react";
+import { useTags } from "../hooks/useTags";
+import type { Tag as TagType } from "../types";
 
-interface TagManagementProps {
-  tags: TagType[];
-  onAddTag: (tag: Omit<TagType, 'id'>) => void;
-  onRemoveTag: (id: string) => void;
-}
-
-export interface ColorOptions {
-  [key: string]: string;
-}
-
-export const colorOptions: ColorOptions = {
-  darkBlue: '#D1E2FF',
-  lightBlue: '#C4ECFF',
-  turquoise: '#C1F5F0',
-  green: '#CFF5D1',
-  yellow: '#FFEAB6',
-  orange: '#FFE0CC',
-  red: '#FFD4E0',
-  pink: '#FAD2FC',
-  purple: '#E0DAFD',
-  gray: '#E5E9F0',
+const colorOptions = {
+  "Light Blue": "#D1E2FF",
+  "Light Green": "#D1FFE2",
+  "Light Yellow": "#FFF2D1",
+  "Light Pink": "#FFD1E2",
+  "Light Purple": "#E2D1FF",
 };
 
-export function TagManagement({ tags, onAddTag, onRemoveTag }: TagManagementProps) {
-  const [newTagName, setNewTagName] = useState('');
-  const [newTagColor, setNewTagColor] = useState('#D1E2FF');
+export function TagManagement() {
+  const { tags, createTag, deleteTag, isCreating, isDeleting } = useTags();
+  const [newTagName, setNewTagName] = useState("");
+  const [newTagColor, setNewTagColor] = useState("#D1E2FF");
 
   const handleAddTag = () => {
-    if (newTagName.trim()) {
-      onAddTag({
+    if (newTagName.trim() && !isCreating) {
+      createTag({
         name: newTagName.trim(),
         color: newTagColor,
       });
-      setNewTagName('');
+      setNewTagName("");
+    }
+  };
+
+  const handleRemoveTag = (id: string) => {
+    if (!isDeleting) {
+      deleteTag(id);
     }
   };
 
   return (
     <div className="p-4">
       <h2 className="text-lg font-semibold mb-4">Tags</h2>
-      
+
       <div className="space-y-4">
         <div className="space-y-2">
           <div className="flex gap-2">
@@ -53,7 +46,7 @@ export function TagManagement({ tags, onAddTag, onRemoveTag }: TagManagementProp
               placeholder="Enter tag name..."
               className="flex-1 px-3 py-1.5 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500"
             />
-            
+
             <input
               type="color"
               value={newTagColor}
@@ -75,7 +68,9 @@ export function TagManagement({ tags, onAddTag, onRemoveTag }: TagManagementProp
                 key={name}
                 onClick={() => setNewTagColor(color)}
                 className={`w-8 h-8 rounded-full transition-transform hover:scale-110 ${
-                  newTagColor === color ? 'ring-2 ring-blue-500 ring-offset-2' : ''
+                  newTagColor === color
+                    ? "ring-2 ring-blue-500 ring-offset-2"
+                    : ""
                 }`}
                 style={{ backgroundColor: color }}
                 title={name}
@@ -93,7 +88,7 @@ export function TagManagement({ tags, onAddTag, onRemoveTag }: TagManagementProp
             >
               <span>{tag.name}</span>
               <button
-                onClick={() => onRemoveTag(tag.id)}
+                onClick={() => handleRemoveTag(tag.id)}
                 className="hover:opacity-75"
               >
                 ×
