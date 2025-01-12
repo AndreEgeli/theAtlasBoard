@@ -1,14 +1,20 @@
 import React, { useState } from "react";
 import { useTasks } from "../hooks/useTasks";
+import { useTodos } from "../hooks/useTodos";
 import type {
   Task,
   TodoItem,
   User as UserType,
   Tag as TagType,
 } from "../types";
+import { Check, Plus, Tag, X } from "lucide-react";
+import { Trash2 } from "lucide-react";
+import { User } from "lucide-react";
+import { createTodo, updateTodo } from "../api/todos";
+import { useTaskTags } from "../hooks/useTaskTags";
 
 interface TaskModalProps {
-  task: Task;
+  taskId: string;
   users: UserType[];
   tags: TagType[];
   boardId: string;
@@ -16,37 +22,34 @@ interface TaskModalProps {
 }
 
 export function TaskModal({
-  task,
+  taskId,
   users,
   tags,
   boardId,
   onClose,
 }: TaskModalProps) {
-  const { updateTask, deleteTask, isUpdating, isDeleting } = useTasks(boardId);
-  const [title, setTitle] = useState(task.title);
-  const [description, setDescription] = useState(task.description);
+  const { tasks, updateTask, deleteTask, isUpdating, isDeleting } =
+    useTasks(boardId);
+  const { addTodo, toggleTodo } = useTodos(taskId);
+  const { addTag, removeTag } = useTaskTags(taskId);
+  const task = tasks.find((t) => t.id === taskId);
+  const [title, setTitle] = useState(task?.title || "");
+  const [description, setDescription] = useState(task?.description || "");
   const [newTodo, setNewTodo] = useState("");
 
-  const handleAddTodo = () => {
+  const handleAddTodo = async () => {
     if (newTodo.trim()) {
-      const newTodoItem: TodoItem = {
-        id: Date.now().toString(),
+      await addTodo({
         text: newTodo.trim(),
         completed: false,
-      };
-      updateTask({
-        id: task.id,
-        updates: { todos: [...task.todos, newTodoItem] },
+        task_id: taskId,
       });
       setNewTodo("");
     }
   };
 
-  const handleToggleTodo = (todoId: string) => {
-    const updatedTodos = task.todos.map((todo) =>
-      todo.id === todoId ? { ...todo, completed: !todo.completed } : todo
-    );
-    updateTask({ id: task.id, updates: { todos: updatedTodos } });
+  const handleToggleTodo = async (todoId: string, completed: boolean) => {
+    await toggleTodo({ id: todoId, completed: !completed });
   };
 
   const handleSave = () => {
@@ -66,15 +69,17 @@ export function TaskModal({
     updateTask({ id: task.id, updates: { assignee } });
   };
 
-  const handleAddTag = (tagId: string) => {
-    updateTask({
-      id: task.id,
-      updates: { tags: [...task.tags, tagId] },
-    });
+  const handleTagSelect = (tagId: string) => {
+    const isSelected = task.task_tags.some((tt) => tt.tag_id === tagId);
+    if (isSelected) {
+      removeTag(tagId);
+    } else {
+      addTag(tagId);
+    }
   };
 
-  const completedTodos = task.todos.filter((todo) => todo.completed).length;
-  const totalTodos = task.todos.length;
+  const completedTodos = task?.todos.filter((todo) => todo.completed).length;
+  const totalTodos = task?.todos.length;
   const progress = totalTodos === 0 ? 0 : (completedTodos / totalTodos) * 100;
 
   const assignedUser = users.find((user) => user.name === task.assignee);
@@ -144,7 +149,7 @@ export function TaskModal({
               value=""
               onChange={(e) => {
                 if (e.target.value) {
-                  handleAddTag(e.target.value);
+                  handleTagSelect(e.target.value);
                   e.target.value = "";
                 }
               }}
@@ -176,7 +181,7 @@ export function TaskModal({
                   <Tag size={14} />
                   {tag.name}
                   <button
-                    onClick={() => handleAddTag(tag.id)}
+                    onClick={() => handleTagSelect(tag.id)}
                     className="hover:opacity-75"
                   >
                     ×
@@ -220,13 +225,13 @@ export function TaskModal({
           )}
 
           <div className="space-y-2 mb-4">
-            {task.todos.map((todo) => (
+            {task?.todos.map((todo) => (
               <div
                 key={todo.id}
                 className="flex items-center gap-2 p-2 hover:bg-gray-50 rounded"
               >
                 <button
-                  onClick={() => handleToggleTodo(todo.id)}
+                  onClick={() => handleToggleTodo(todo.id, todo.completed)}
                   className={`w-5 h-5 rounded border flex items-center justify-center ${
                     todo.completed
                       ? "bg-blue-500 border-blue-500 text-white"

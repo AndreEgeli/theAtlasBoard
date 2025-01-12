@@ -74,9 +74,23 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     }
   };
 
+  const getCurrentUserId = async () => {
+    const {
+      data: { user },
+    } = await supabase.auth.getUser();
+    return user?.id;
+  };
+
   return (
     <AuthContext.Provider
-      value={{ user, loading, error, signIn, signUp, signOut }}
+      value={{
+        user,
+        loading,
+        error,
+        signIn,
+        signUp,
+        signOut,
+      }}
     >
       {children}
     </AuthContext.Provider>

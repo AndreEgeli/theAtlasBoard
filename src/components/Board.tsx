@@ -20,10 +20,17 @@ interface BoardProps {
   users: User[];
   tags: Tag[];
   onTaskClick: (taskId: string) => void;
+  onTaskCreated: (taskId: string) => void;
 }
 
-export function Board({ boardId, users, tags, onTaskClick }: BoardProps) {
-  const { tasks, moveTask, createTask } = useTasks(boardId);
+export function Board({
+  boardId,
+  users,
+  tags,
+  onTaskClick,
+  onTaskCreated,
+}: BoardProps) {
+  const { tasks, createTask, moveTask } = useTasks(boardId);
   const [draggedTaskId, setDraggedTaskId] = useState<string | null>(null);
   const [dragOverTaskId, setDragOverTaskId] = useState<string | null>(null);
 
@@ -66,8 +73,8 @@ export function Board({ boardId, users, tags, onTaskClick }: BoardProps) {
     setDragOverTaskId(null);
   };
 
-  const handleAddTask = (position: CellPosition) => {
-    createTask({
+  const handleAddTask = async (position: CellPosition) => {
+    const newTask = await createTask({
       title: "New Task",
       description: "",
       importance: position.importance,
@@ -78,6 +85,7 @@ export function Board({ boardId, users, tags, onTaskClick }: BoardProps) {
       tags: [],
       order: tasks.length,
     });
+    onTaskCreated(newTask.id);
   };
 
   const handleCellClick = (e: React.MouseEvent, position: CellPosition) => {

@@ -1,11 +1,14 @@
-import { supabase } from '../lib/supabase';
-import type { Task, CellPosition } from '../types';
+import { supabase } from "../lib/supabase";
+import type { Task, CellPosition } from "../types";
+import { getCurrentUserId } from "../utils/auth";
 
-export async function createTask(boardId: string, task: Omit<Task, 'id'>) {
+export async function createTask(boardId: string, task: Omit<Task, "id">) {
+  const userId = await getCurrentUserId();
   const { data, error } = await supabase
-    .from('tasks')
+    .from("tasks")
     .insert({
       board_id: boardId,
+      user_id: userId,
       title: task.title,
       description: task.description,
       assignee: task.assignee,
@@ -21,29 +24,25 @@ export async function createTask(boardId: string, task: Omit<Task, 'id'>) {
 
   // Create todos if any
   if (task.todos.length > 0) {
-    const { error: todosError } = await supabase
-      .from('todos')
-      .insert(
-        task.todos.map(todo => ({
-          task_id: data.id,
-          text: todo.text,
-          completed: todo.completed,
-        }))
-      );
+    const { error: todosError } = await supabase.from("todos").insert(
+      task.todos.map((todo) => ({
+        task_id: data.id,
+        text: todo.text,
+        completed: todo.completed,
+      }))
+    );
 
     if (todosError) throw todosError;
   }
 
   // Create tag associations if any
   if (task.tags.length > 0) {
-    const { error: tagsError } = await supabase
-      .from('task_tags')
-      .insert(
-        task.tags.map(tagId => ({
-          task_id: data.id,
-          tag_id: tagId,
-        }))
-      );
+    const { error: tagsError } = await supabase.from("task_tags").insert(
+      task.tags.map((tagId) => ({
+        task_id: data.id,
+        tag_id: tagId,
+      }))
+    );
 
     if (tagsError) throw tagsError;
   }
@@ -53,9 +52,9 @@ export async function createTask(boardId: string, task: Omit<Task, 'id'>) {
 
 export async function updateTask(id: string, updates: Partial<Task>) {
   const { data, error } = await supabase
-    .from('tasks')
+    .from("tasks")
     .update(updates)
-    .eq('id', id)
+    .eq("id", id)
     .select()
     .single();
 
@@ -65,12 +64,12 @@ export async function updateTask(id: string, updates: Partial<Task>) {
 
 export async function moveTask(id: string, position: CellPosition) {
   const { data, error } = await supabase
-    .from('tasks')
+    .from("tasks")
     .update({
       importance: position.importance,
       timeframe: position.timeframe,
     })
-    .eq('id', id)
+    .eq("id", id)
     .select()
     .single();
 
@@ -79,10 +78,7 @@ export async function moveTask(id: string, position: CellPosition) {
 }
 
 export async function deleteTask(id: string) {
-  const { error } = await supabase
-    .from('tasks')
-    .delete()
-    .eq('id', id);
+  const { error } = await supabase.from("tasks").delete().eq("id", id);
 
   if (error) throw error;
 }

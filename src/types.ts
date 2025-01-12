@@ -8,6 +8,7 @@ export interface TodoItem {
   id: string;
   text: string;
   completed: boolean;
+  task_id: string;
 }
 
 export interface Tag {
@@ -22,9 +23,9 @@ export interface Task {
   description: string;
   assignee?: string;
   tags: string[];
-  importance: 'not critical' | 'critical' | 'super critical';
-  timeframe: '>3 hours' | '> 1 day' | '> 1 week';
-  status: 'pending' | 'started' | 'in_review' | 'completed';
+  importance: "not critical" | "critical" | "super critical";
+  timeframe: ">3 hours" | "> 1 day" | "> 1 week";
+  status: "pending" | "started" | "in_review" | "completed";
   todos: TodoItem[];
   order?: number;
 }
@@ -36,6 +37,6 @@ export interface Board {
 }
 
 export interface CellPosition {
-  importance: Task['importance'];
-  timeframe: Task['timeframe'];
+  importance: Task["importance"];
+  timeframe: Task["timeframe"];
 }

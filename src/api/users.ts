@@ -1,5 +1,6 @@
 import { supabase } from "../lib/supabase";
 import type { User } from "../types";
+import { getCurrentUserId } from "../utils/auth";
 
 export async function getUsers() {
   const { data, error } = await supabase
@@ -16,6 +17,7 @@ export async function createUser(
   authId: string,
   avatarFile?: File
 ) {
+  const userId = await getCurrentUserId();
   let avatarUrl: string | undefined;
 
   if (avatarFile) {
@@ -42,6 +44,7 @@ export async function createUser(
       auth_id: authId,
       name,
       avatar: avatarUrl,
+      user_id: userId,
     })
     .select()
     .single();

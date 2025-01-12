@@ -17,8 +17,9 @@ export function useBoards() {
 
   const createBoardMutation = useMutation({
     mutationFn: createBoard,
-    onSuccess: () => {
+    onSuccess: (newBoard) => {
       queryClient.invalidateQueries({ queryKey: ["boards"] });
+      return newBoard;
     },
   });
 

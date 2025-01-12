@@ -7,7 +7,7 @@ import {
 import { AuthProvider, useAuth } from "./contexts/AuthContext";
 import { Login } from "./pages/Login";
 import { Loader } from "lucide-react";
-import React, { useState } from "react";
+import React, { useEffect, useState } from "react";
 import { Layout } from "lucide-react";
 import { Board } from "./components/Board";
 import { UserManagement } from "./components/UserManagement";
@@ -51,9 +51,27 @@ function AppContent() {
   const { boards, createBoard, isLoading: boardsLoading } = useBoards();
   const { users } = useUsers();
   const { tags } = useTags();
-  const [currentBoardId, setCurrentBoardId] = useState(boards?.[0]?.id ?? "");
+  const [currentBoardId, setCurrentBoardId] = useState("");
   const [selectedTaskId, setSelectedTaskId] = useState<string | null>(null);
   const [newBoardName, setNewBoardName] = useState("");
+
+  useEffect(() => {
+    if (boards.length > 0 && !currentBoardId) {
+      setCurrentBoardId(boards[0].id);
+    }
+  }, [boards, currentBoardId]);
+
+  const handleAddBoard = async () => {
+    if (newBoardName.trim()) {
+      const newBoard = await createBoard(newBoardName.trim());
+      setNewBoardName("");
+      setCurrentBoardId(newBoard.id);
+    }
+  };
+
+  const handleTaskCreated = (taskId: string) => {
+    setSelectedTaskId(taskId);
+  };
 
   if (boardsLoading) {
     return (
@@ -62,13 +80,6 @@ function AppContent() {
       </div>
     );
   }
-
-  const handleAddBoard = () => {
-    if (newBoardName.trim()) {
-      createBoard(newBoardName.trim());
-      setNewBoardName("");
-    }
-  };
 
   return (
     <div className="min-h-screen bg-gray-100">
@@ -143,6 +154,7 @@ function AppContent() {
               users={users}
               tags={tags}
               onTaskClick={setSelectedTaskId}
+              onTaskCreated={handleTaskCreated}
             />
           </div>
         )}
@@ -150,7 +162,7 @@ function AppContent() {
 
       {selectedTaskId && (
         <TaskModal
-          task={selectedTaskId}
+          taskId={selectedTaskId}
           users={users}
           tags={tags}
           boardId={currentBoardId}

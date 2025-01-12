@@ -28,12 +28,14 @@ export function useTasks(boardId: string) {
         tags: task.task_tags.map((tt) => tt.tag_id),
       }));
     },
+    enabled: !!boardId,
   });
 
   const createTaskMutation = useMutation({
     mutationFn: (task: Omit<Task, "id">) => createTask(boardId, task),
-    onSuccess: () => {
+    onSuccess: (newTask) => {
       queryClient.invalidateQueries({ queryKey: ["tasks", boardId] });
+      return newTask;
     },
   });
 

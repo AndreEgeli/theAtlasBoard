@@ -1,9 +1,9 @@
-import { supabase } from '../lib/supabase';
-import type { TodoItem } from '../types';
+import { supabase } from "../lib/supabase";
+import type { TodoItem } from "../types";
 
-export async function createTodo(taskId: string, todo: Omit<TodoItem, 'id'>) {
+export async function createTodo(taskId: string, todo: Omit<TodoItem, "id">) {
   const { data, error } = await supabase
-    .from('todos')
+    .from("todos")
     .insert({
       task_id: taskId,
       text: todo.text,
@@ -18,9 +18,9 @@ export async function createTodo(taskId: string, todo: Omit<TodoItem, 'id'>) {
 
 export async function updateTodo(id: string, updates: Partial<TodoItem>) {
   const { data, error } = await supabase
-    .from('todos')
+    .from("todos")
     .update(updates)
-    .eq('id', id)
+    .eq("id", id)
     .select()
     .single();
 
@@ -29,10 +29,7 @@ export async function updateTodo(id: string, updates: Partial<TodoItem>) {
 }
 
 export async function deleteTodo(id: string) {
-  const { error } = await supabase
-    .from('todos')
-    .delete()
-    .eq('id', id);
+  const { error } = await supabase.from("todos").delete().eq("id", id);
 
   if (error) throw error;
 }
