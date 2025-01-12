@@ -45,8 +45,8 @@ export function TaskModal({
   const taskTags = task?.tags || [];
   const todos = task?.todos || [];
 
-  console.log("task", task);
-  console.log(task.id);
+  console.log(taskTags);
+
   const handleAddTodo = async () => {
     if (newTodo.trim()) {
       await addTodo({
@@ -79,12 +79,15 @@ export function TaskModal({
     updateTask({ id: task.id, updates: { assignee } });
   };
 
-  const handleTagSelect = (tagId: string) => {
-    const isSelected = taskTags.some((tagId) => tagId === tagId);
+  const handleTagSelect = async (tagId: string) => {
+    const isSelected = taskTags.some(
+      (existingTagId) => existingTagId === tagId
+    );
+    console.log(isSelected);
     if (isSelected) {
-      removeTag(tagId);
+      await removeTag(tagId);
     } else {
-      addTag(tagId);
+      await addTag(tagId);
     }
   };
 
@@ -159,17 +162,18 @@ export function TaskModal({
               value=""
               onChange={(e) => {
                 if (e.target.value) {
+                  console.log(e.target.value);
                   handleTagSelect(e.target.value);
                   e.target.value = "";
                 }
               }}
-              className="w-full px-2 py-1 border rounded"
+              className="w-full px-2 py-1 border rounded "
             >
               <option value="">Select a tag...</option>
               {tags
                 .filter((tag) => !taskTags.includes(tag.id))
                 .map((tag) => (
-                  <option key={tag.id} value={tag.id}>
+                  <option key={tag.id} value={tag.id} className="">
                     {tag.name}
                   </option>
                 ))}

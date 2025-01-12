@@ -15,15 +15,8 @@ export function useUsers() {
   });
 
   const createUserMutation = useMutation({
-    mutationFn: ({
-      name,
-      authId,
-      avatarFile,
-    }: {
-      name: string;
-      authId: string;
-      avatarFile?: File;
-    }) => createUser(name, authId, avatarFile),
+    mutationFn: (user: Omit<User, "id"> & { avatarFile?: File }) =>
+      createUser(user),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["users"] });
     },
@@ -40,8 +33,8 @@ export function useUsers() {
     users,
     isLoading,
     error,
-    createUser: createUserMutation.mutate,
-    deleteUser: deleteUserMutation.mutate,
+    createUser: createUserMutation.mutateAsync,
+    deleteUser: deleteUserMutation.mutateAsync,
     isCreating: createUserMutation.isPending,
     isDeleting: deleteUserMutation.isPending,
   };

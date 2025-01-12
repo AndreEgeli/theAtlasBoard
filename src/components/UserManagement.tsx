@@ -4,24 +4,24 @@ import { useAuth } from "../contexts/AuthContext";
 import { useUsers } from "../hooks/useUsers";
 
 export function UserManagement() {
-  const { user: authUser } = useAuth();
   const { users, createUser, deleteUser, isCreating, isDeleting } = useUsers();
   const [newUserName, setNewUserName] = useState("");
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const [avatarPreview, setAvatarPreview] = useState<string | null>(null);
 
   const handleAddUser = async () => {
-    if (!authUser || !newUserName.trim() || isCreating) return;
+    if (!newUserName.trim() || isCreating) return;
 
     try {
       const file = fileInputRef.current?.files?.[0];
       await createUser({
         name: newUserName.trim(),
-        authId: authUser.id,
         avatarFile: file,
       });
       setNewUserName("");
       if (fileInputRef.current) {
         fileInputRef.current.value = "";
+        setAvatarPreview(null);
       }
     } catch (error) {
       console.error("Error creating user:", error);
@@ -60,6 +60,16 @@ export function UserManagement() {
                 accept="image/*"
                 className="hidden"
                 disabled={isCreating}
+                onChange={(e) => {
+                  const file = e.target.files?.[0];
+                  if (file) {
+                    const reader = new FileReader();
+                    reader.onloadend = () => {
+                      setAvatarPreview(reader.result as string);
+                    };
+                    reader.readAsDataURL(file);
+                  }
+                }}
               />
               <button
                 onClick={() => fileInputRef.current?.click()}
@@ -69,6 +79,13 @@ export function UserManagement() {
                 <Upload size={16} />
                 Upload Avatar
               </button>
+              {avatarPreview && (
+                <img
+                  src={avatarPreview}
+                  alt="Avatar Preview"
+                  className="w-10 h-10 rounded-full border border-gray-300"
+                />
+              )}
             </div>
           </div>
           <button

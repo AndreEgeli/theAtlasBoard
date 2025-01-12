@@ -9,6 +9,7 @@ export function useTaskTags(taskId: string) {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["tasks"] });
       queryClient.invalidateQueries({ queryKey: ["task-tags", taskId] });
+      console.log("added tag");
     },
   });
 
@@ -21,8 +22,8 @@ export function useTaskTags(taskId: string) {
   });
 
   return {
-    addTag: addTagMutation.mutate,
-    removeTag: removeTagMutation.mutate,
+    addTag: addTagMutation.mutateAsync,
+    removeTag: removeTagMutation.mutateAsync,
     isAdding: addTagMutation.isPending,
     isRemoving: removeTagMutation.isPending,
   };

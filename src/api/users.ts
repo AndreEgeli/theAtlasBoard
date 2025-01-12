@@ -13,21 +13,19 @@ export async function getUsers() {
 }
 
 export async function createUser(
-  name: string,
-  authId: string,
-  avatarFile?: File
+  user: Omit<User, "id"> & { avatarFile?: File }
 ) {
   const userId = await getCurrentUserId();
   let avatarUrl: string | undefined;
 
-  if (avatarFile) {
-    const fileExt = avatarFile.name.split(".").pop();
+  if (user.avatarFile) {
+    const fileExt = user.avatarFile.name.split(".").pop();
     const fileName = `${Math.random()}.${fileExt}`;
     const filePath = `avatars/${fileName}`;
 
     const { error: uploadError } = await supabase.storage
       .from("user-avatars")
-      .upload(filePath, avatarFile);
+      .upload(filePath, user.avatarFile);
 
     if (uploadError) throw uploadError;
 
@@ -41,10 +39,9 @@ export async function createUser(
   const { data, error } = await supabase
     .from("users")
     .insert({
-      auth_id: authId,
-      name,
+      name: user.name,
       avatar: avatarUrl,
-      user_id: userId,
+      auth_id: userId,
     })
     .select()
     .single();
