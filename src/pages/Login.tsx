@@ -20,13 +20,14 @@ export function Login() {
     try {
       if (isSignUp) {
         await signUp(email, password);
-        setError("Please check your email for verification link");
+        navigate("/");
       } else {
         await signIn(email, password);
         navigate("/");
       }
     } catch (err) {
-      setError(err instanceof Error ? err.message : "An error occurred");
+      const message = err instanceof Error ? err.message : "An error occurred";
+      setError(message);
     } finally {
       setLoading(false);
     }

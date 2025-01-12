@@ -30,8 +30,6 @@ export function TaskCard({
     return null;
   }
 
-  console.log(task);
-
   const todos = task.todos || [];
   const taskTags = task.tags || [];
 
