@@ -84,12 +84,18 @@ export function TagManagement() {
             <div
               key={tag.id}
               className="flex items-center gap-2 px-3 py-1.5 rounded-full"
-              style={{ backgroundColor: `${tag.color}20`, color: tag.color }}
+              style={{
+                backgroundColor: `${tag.color}80`,
+                color: "black",
+                fontSize: "12px",
+              }} // Increased opacity for better visibility
             >
-              <span>{tag.name}</span>
+              <span className="font-semibold">{tag.name}</span>{" "}
+              {/* Made the text bold for better visibility */}
               <button
                 onClick={() => handleRemoveTag(tag.id)}
                 className="hover:opacity-75"
+                aria-label={`Remove tag ${tag.name}`} // Added aria-label for accessibility
               >
                 ×
               </button>

@@ -14,35 +14,45 @@ import { createTodo, updateTodo } from "../api/todos";
 import { useTaskTags } from "../hooks/useTaskTags";
 
 interface TaskModalProps {
+  boardId: string;
   taskId: string;
   users: UserType[];
   tags: TagType[];
-  boardId: string;
   onClose: () => void;
 }
 
 export function TaskModal({
+  boardId,
   taskId,
   users,
   tags,
-  boardId,
   onClose,
 }: TaskModalProps) {
   const { tasks, updateTask, deleteTask, isUpdating, isDeleting } =
     useTasks(boardId);
+  const task = tasks.find((t) => t.id === taskId);
+
   const { addTodo, toggleTodo } = useTodos(taskId);
   const { addTag, removeTag } = useTaskTags(taskId);
-  const task = tasks.find((t) => t.id === taskId);
   const [title, setTitle] = useState(task?.title || "");
   const [description, setDescription] = useState(task?.description || "");
   const [newTodo, setNewTodo] = useState("");
 
+  if (!task) {
+    return null;
+  }
+
+  const taskTags = task?.tags || [];
+  const todos = task?.todos || [];
+
+  console.log("task", task);
+  console.log(task.id);
   const handleAddTodo = async () => {
     if (newTodo.trim()) {
       await addTodo({
         text: newTodo.trim(),
         completed: false,
-        task_id: taskId,
+        task_id: task.id,
       });
       setNewTodo("");
     }
@@ -70,7 +80,7 @@ export function TaskModal({
   };
 
   const handleTagSelect = (tagId: string) => {
-    const isSelected = task.task_tags.some((tt) => tt.tag_id === tagId);
+    const isSelected = taskTags.some((tagId) => tagId === tagId);
     if (isSelected) {
       removeTag(tagId);
     } else {
@@ -78,8 +88,8 @@ export function TaskModal({
     }
   };
 
-  const completedTodos = task?.todos.filter((todo) => todo.completed).length;
-  const totalTodos = task?.todos.length;
+  const completedTodos = todos.filter((todo) => todo.completed).length;
+  const totalTodos = todos.length;
   const progress = totalTodos === 0 ? 0 : (completedTodos / totalTodos) * 100;
 
   const assignedUser = users.find((user) => user.name === task.assignee);
@@ -157,7 +167,7 @@ export function TaskModal({
             >
               <option value="">Select a tag...</option>
               {tags
-                .filter((tag) => !task.tags.includes(tag.id))
+                .filter((tag) => !taskTags.includes(tag.id))
                 .map((tag) => (
                   <option key={tag.id} value={tag.id}>
                     {tag.name}
@@ -167,9 +177,9 @@ export function TaskModal({
           </div>
         </div>
 
-        {task.tags.length > 0 && (
+        {taskTags.length > 0 && (
           <div className="flex flex-wrap gap-2 mb-6">
-            {task.tags.map((tagId) => {
+            {taskTags.map((tagId) => {
               const tag = tags.find((t) => t.id === tagId);
               if (!tag) return null;
               return (
@@ -225,7 +235,7 @@ export function TaskModal({
           )}
 
           <div className="space-y-2 mb-4">
-            {task?.todos.map((todo) => (
+            {todos.map((todo) => (
               <div
                 key={todo.id}
                 className="flex items-center gap-2 p-2 hover:bg-gray-50 rounded"

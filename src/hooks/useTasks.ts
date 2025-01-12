@@ -23,9 +23,9 @@ export function useTasks(boardId: string) {
 
       if (error) throw error;
 
-      return data.map((task) => ({
+      return data.map((task: any) => ({
         ...task,
-        tags: task.task_tags.map((tt) => tt.tag_id),
+        tags: task.task_tags.map((tt: any) => tt.tag_id),
       }));
     },
     enabled: !!boardId,
@@ -35,7 +35,7 @@ export function useTasks(boardId: string) {
     mutationFn: (task: Omit<Task, "id">) => createTask(boardId, task),
     onSuccess: (newTask) => {
       queryClient.invalidateQueries({ queryKey: ["tasks", boardId] });
-      return newTask;
+      return newTask.id;
     },
   });
 
@@ -63,12 +63,12 @@ export function useTasks(boardId: string) {
   });
 
   return {
-    tasks,
+    tasks: tasks || [],
     isLoading,
-    createTask: createTaskMutation.mutate,
-    updateTask: updateTaskMutation.mutate,
-    moveTask: moveTaskMutation.mutate,
-    deleteTask: deleteTaskMutation.mutate,
+    createTask: createTaskMutation.mutateAsync,
+    updateTask: updateTaskMutation.mutateAsync,
+    moveTask: moveTaskMutation.mutateAsync,
+    deleteTask: deleteTaskMutation.mutateAsync,
     isCreating: createTaskMutation.isPending,
     isUpdating: updateTaskMutation.isPending,
     isMoving: moveTaskMutation.isPending,

@@ -41,9 +41,9 @@ export function useBoards() {
   return {
     boards,
     isLoading,
-    createBoard: createBoardMutation.mutate,
-    updateBoard: updateBoardMutation.mutate,
-    deleteBoard: deleteBoardMutation.mutate,
+    createBoard: createBoardMutation.mutateAsync,
+    updateBoard: updateBoardMutation.mutateAsync,
+    deleteBoard: deleteBoardMutation.mutateAsync,
     isCreating: createBoardMutation.isPending,
     isUpdating: updateBoardMutation.isPending,
     isDeleting: deleteBoardMutation.isPending,

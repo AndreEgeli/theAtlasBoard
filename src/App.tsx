@@ -6,7 +6,7 @@ import {
 } from "react-router-dom";
 import { AuthProvider, useAuth } from "./contexts/AuthContext";
 import { Login } from "./pages/Login";
-import { Loader } from "lucide-react";
+import { Loader, LogOutIcon, TagIcon, UserIcon } from "lucide-react";
 import React, { useEffect, useState } from "react";
 import { Layout } from "lucide-react";
 import { Board } from "./components/Board";
@@ -19,6 +19,7 @@ import { useUsers } from "./hooks/useUsers";
 import { useTags } from "./hooks/useTags";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { ReactQueryDevtools } from "@tanstack/react-query-devtools";
+import { Task } from "./types";
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -51,6 +52,7 @@ function AppContent() {
   const { boards, createBoard, isLoading: boardsLoading } = useBoards();
   const { users } = useUsers();
   const { tags } = useTags();
+  const { signOut } = useAuth();
   const [currentBoardId, setCurrentBoardId] = useState("");
   const [selectedTaskId, setSelectedTaskId] = useState<string | null>(null);
   const [newBoardName, setNewBoardName] = useState("");
@@ -93,6 +95,7 @@ function AppContent() {
               <Popover
                 trigger={
                   <button className="flex items-center gap-2 px-3 py-2 text-gray-700 hover:bg-gray-100 rounded-lg transition-colors">
+                    <UserIcon className="h-5 w-5" />
                     <span className="text-sm font-medium">Team</span>
                   </button>
                 }
@@ -102,20 +105,28 @@ function AppContent() {
               <Popover
                 trigger={
                   <button className="flex items-center gap-2 px-3 py-2 text-gray-700 hover:bg-gray-100 rounded-lg transition-colors">
+                    <TagIcon className="h-5 w-5" />
                     <span className="text-sm font-medium">Tags</span>
                   </button>
                 }
                 align="end"
                 content={<TagManagement />}
               />
+              <button
+                onClick={signOut}
+                className="flex items-center gap-2 px-3 py-2 text-red-600 hover:bg-red-100 rounded-lg transition-colors"
+              >
+                <LogOutIcon className="h-5 w-5" />
+                <span className="text-sm font-medium">Sign Out</span>
+              </button>
             </div>
           </div>
 
-          <div className="flex items-center gap-4">
+          <div className="flex items-center gap-4 w-full">
             <select
               value={currentBoardId}
               onChange={(e) => setCurrentBoardId(e.target.value)}
-              className="px-3 py-1.5 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+              className="flex-grow px-3 py-1.5 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
             >
               {boards.map((board) => (
                 <option key={board.id} value={board.id}>
@@ -148,15 +159,13 @@ function AppContent() {
         </div>
 
         {currentBoardId && (
-          <div className="pl-24">
-            <Board
-              boardId={currentBoardId}
-              users={users}
-              tags={tags}
-              onTaskClick={setSelectedTaskId}
-              onTaskCreated={handleTaskCreated}
-            />
-          </div>
+          <Board
+            boardId={currentBoardId}
+            users={users}
+            tags={tags}
+            onTaskClick={setSelectedTaskId}
+            onTaskCreated={handleTaskCreated}
+          />
         )}
       </div>
 

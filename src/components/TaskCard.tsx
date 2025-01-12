@@ -1,9 +1,15 @@
 import React from "react";
-import { Task, User as UserType, Tag as TagType } from "../types";
+import {
+  Task,
+  User as UserType,
+  Tag as TagType,
+  TodoItem,
+  Tag,
+} from "../types";
 import { useTasks } from "../hooks/useTasks";
 
 interface TaskCardProps {
-  task: Task;
+  taskId: string;
   users: UserType[];
   tags: TagType[];
   boardId: string;
@@ -11,38 +17,32 @@ interface TaskCardProps {
 }
 
 export function TaskCard({
-  task,
+  taskId,
   users,
   tags,
   boardId,
   onClick,
 }: TaskCardProps) {
-  const { updateTask } = useTasks(boardId);
+  const { tasks } = useTasks(boardId);
+  const task = tasks.find((t) => t.id === taskId);
+
+  if (!task) {
+    return null;
+  }
+
+  console.log(task);
+
+  const todos = task.todos || [];
+  const taskTags = task.tags || [];
+
+  const completedTodos = todos.filter(
+    (todo: TodoItem) => todo.completed
+  ).length;
+  const totalTodos = todos.length;
+  const progress = totalTodos === 0 ? 0 : (completedTodos / totalTodos) * 100;
 
   const handleDragStart = (e: React.DragEvent) => {
     e.dataTransfer.setData("taskId", task.id);
-  };
-
-  const handleAssigneeChange = (assignee: string) => {
-    updateTask({ id: task.id, updates: { assignee } });
-  };
-
-  const handleAddTag = (tagId: string) => {
-    updateTask({
-      id: task.id,
-      updates: { tags: [...task.tags, tagId] },
-    });
-  };
-
-  const handleRemoveTag = (tagId: string) => {
-    updateTask({
-      id: task.id,
-      updates: { tags: task.tags.filter((id) => id !== tagId) },
-    });
-  };
-
-  const handleStatusChange = (status: Task["status"]) => {
-    updateTask({ id: task.id, updates: { status } });
   };
 
   const statusColors = {
@@ -86,10 +86,10 @@ export function TaskCard({
         )}
       </div>
 
-      {task.tags.length > 0 && (
+      {taskTags.length > 0 && (
         <div className="flex flex-wrap gap-1 mt-2">
-          {task.tags.map((tagId) => {
-            const tag = tags.find((t) => t.id === tagId);
+          {taskTags.map((tagId: string) => {
+            const tag = tags.find((t: Tag) => t.id === tagId);
             if (!tag) return null;
             return (
               <span
@@ -101,6 +101,17 @@ export function TaskCard({
               </span>
             );
           })}
+        </div>
+      )}
+      {totalTodos > 0 && (
+        <div className="h-1 mt-4 border rounded w-full">
+          <div
+            className="h-full"
+            style={{
+              width: `${progress}%`,
+              backgroundColor: progress === 100 ? "green" : "blue",
+            }}
+          />
         </div>
       )}
     </div>

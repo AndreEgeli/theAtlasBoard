@@ -100,7 +100,7 @@ export function Board({
   };
 
   return (
-    <div className="relative">
+    <div className="relative border-2 border-blue-500 rounded-lg p-4 pl-24">
       <div className="grid grid-cols-3 gap-0 mb-2">
         {timeframeLevels.map((time) => (
           <div
@@ -112,7 +112,7 @@ export function Board({
         ))}
       </div>
 
-      <div className="absolute -left-24 top-0 h-full flex flex-col justify-around">
+      <div className="absolute left-0 top-0 h-full flex flex-col justify-around px-4">
         {importanceLevels.map((importance) => (
           <div
             key={importance}
@@ -123,7 +123,7 @@ export function Board({
         ))}
       </div>
 
-      <div className="grid grid-cols-3 gap-0 border border-gray-200 rounded-lg bg-white">
+      <div className="grid grid-cols-3 gap-0 bg-white">
         {importanceLevels.map((importance, i) => (
           <React.Fragment key={importance}>
             <div className="col-span-3 grid grid-cols-3">
@@ -173,7 +173,7 @@ export function Board({
                         }`}
                       >
                         <TaskCard
-                          task={task}
+                          taskId={task.id}
                           users={users}
                           tags={tags}
                           boardId={boardId}
