@@ -1,4 +1,3 @@
-import { useAuth } from "../contexts/AuthContext";
 import { supabase } from "../lib/supabase";
 import type { Board } from "../types";
 import { getCurrentUserId } from "../utils/auth";
@@ -6,28 +5,37 @@ import { getCurrentUserId } from "../utils/auth";
 export async function getBoards() {
   const { data, error } = await supabase
     .from("boards")
+    .select("id, name, created_at")
+    .order("created_at");
+
+  if (error) throw error;
+  return data;
+}
+
+export async function getBoardDetails(boardId: string) {
+  const { data, error } = await supabase
+    .from("boards")
     .select(
       `
-      id,
-      name,
-      tasks:tasks(
-        id,
-        title,
-        description,
-        assignee,
-        importance,
-        timeframe,
-        status,
-        order,
-        todos(id, text, completed),
-        task_tags(tag_id)
+      *,
+      tasks (
+        *,
+        todos (*),
+        task_tags (tag_id)
       )
     `
     )
-    .order("created_at", { ascending: true });
+    .eq("id", boardId)
+    .single();
 
   if (error) throw error;
-  return data as Board[];
+  return {
+    ...data,
+    tasks: data.tasks.map((task: any) => ({
+      ...task,
+      tags: task.task_tags.map((tt: any) => tt.tag_id),
+    })),
+  };
 }
 
 export async function createBoard(name: string) {

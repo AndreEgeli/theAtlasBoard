@@ -34,6 +34,7 @@ export interface Board {
   id: string;
   name: string;
   tasks: Task[];
+  created_at: string;
 }
 
 export interface CellPosition {

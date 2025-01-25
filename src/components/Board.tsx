@@ -21,6 +21,7 @@ interface BoardProps {
   tags: Tag[];
   onTaskClick: (taskId: string) => void;
   onTaskCreated: (taskId: string) => void;
+  filterTasks: (tasks: Task[]) => Task[];
 }
 
 export function Board({
@@ -29,6 +30,7 @@ export function Board({
   tags,
   onTaskClick,
   onTaskCreated,
+  filterTasks,
 }: BoardProps) {
   const { tasks, createTask, moveTask } = useTasks(boardId);
   const [draggedTaskId, setDraggedTaskId] = useState<string | null>(null);
@@ -159,6 +161,7 @@ export function Board({
                         task.importance === importance &&
                         task.timeframe === timeframe
                     )
+                    .filter((task) => filterTasks([task]).length > 0)
                     .sort((a, b) => (a.order || 0) - (b.order || 0))
                     .map((task) => (
                       <div

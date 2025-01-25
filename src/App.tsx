@@ -3,24 +3,35 @@ import {
   Routes,
   Route,
   Navigate,
+  useLocation,
+  useNavigate,
+  useParams,
 } from "react-router-dom";
 import { AuthProvider, useAuth } from "./contexts/AuthContext";
 import { Login } from "./pages/Login";
-import { Loader, LogOutIcon, TagIcon, UserIcon } from "lucide-react";
+import {
+  Loader,
+  LogOutIcon,
+  TagIcon,
+  UserIcon,
+  Archive,
+  ArrowLeft,
+} from "lucide-react";
 import React, { useEffect, useState } from "react";
-import { Layout } from "lucide-react";
 import { Board } from "./components/Board";
 import { UserManagement } from "./components/UserManagement";
 import { TagManagement } from "./components/TagManagement";
 import { TaskModal } from "./components/TaskModal";
 import { Popover } from "./components/Popover";
-import { useBoards } from "./hooks/useBoards";
+import { useBoardDetails } from "./hooks/useBoards";
 import { useUsers } from "./hooks/useUsers";
 import { useTags } from "./hooks/useTags";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { ReactQueryDevtools } from "@tanstack/react-query-devtools";
-import { Task } from "./types";
-
+import { FilterPopover } from "./components/FilterPopover";
+import { useFiltering } from "./hooks/useFiltering";
+import { ArchiveBoard } from "./components/ArchiveBoard";
+import { BoardIndex } from "./components/BoardIndex";
 const queryClient = new QueryClient({
   defaultOptions: {
     queries: {
@@ -49,33 +60,27 @@ function ProtectedRoute({ children }: { children: React.ReactNode }) {
 }
 
 function AppContent() {
-  const { boards, createBoard, isLoading: boardsLoading } = useBoards();
+  const { boardId } = useParams();
+  const {
+    board,
+    isLoading: boardLoading,
+    updateBoard,
+    deleteBoard,
+  } = useBoardDetails(boardId ?? "");
   const { users } = useUsers();
   const { tags } = useTags();
   const { signOut } = useAuth();
-  const [currentBoardId, setCurrentBoardId] = useState("");
   const [selectedTaskId, setSelectedTaskId] = useState<string | null>(null);
-  const [newBoardName, setNewBoardName] = useState("");
-
-  useEffect(() => {
-    if (boards.length > 0 && !currentBoardId) {
-      setCurrentBoardId(boards[0].id);
-    }
-  }, [boards, currentBoardId]);
-
-  const handleAddBoard = async () => {
-    if (newBoardName.trim()) {
-      const newBoard = await createBoard(newBoardName.trim());
-      setNewBoardName("");
-      setCurrentBoardId(newBoard.id);
-    }
-  };
+  const { filters, setFilters, filterTasks, hasActiveFilters, clearFilters } =
+    useFiltering();
+  const location = useLocation();
+  const navigate = useNavigate();
 
   const handleTaskCreated = (taskId: string) => {
     setSelectedTaskId(taskId);
   };
 
-  if (boardsLoading) {
+  if (boardLoading) {
     return (
       <div className="h-screen w-screen flex items-center justify-center">
         <Loader className="animate-spin h-8 w-8 text-blue-500" />
@@ -83,14 +88,31 @@ function AppContent() {
     );
   }
 
+  // if (!boardId || !board) {
+  //   return <Navigate to="/" />;
+  // }
+
   return (
     <div className="min-h-screen bg-gray-100">
       <div className="max-w-7xl mx-auto py-8 px-4">
         <div className="mb-8 space-y-6">
           <div className="flex items-center justify-between">
-            <h1 className="text-3xl font-bold text-gray-900">
-              Task Planning Board
-            </h1>
+            <div className="flex items-center gap-4">
+              {location.pathname.endsWith("/archive") && (
+                <button
+                  onClick={() => navigate(`/board/${boardId}`)}
+                  className="flex items-center gap-2 px-3 py-2 text-gray-700 hover:bg-gray-100 rounded-lg transition-colors"
+                >
+                  <ArrowLeft size={20} />
+                  <span className="text-sm font-medium">Back to Board</span>
+                </button>
+              )}
+              <h1 className="text-3xl font-bold text-gray-900">
+                {location.pathname.endsWith("/archive")
+                  ? "Archive"
+                  : "Task Planning Board"}
+              </h1>
+            </div>
             <div className="flex items-center gap-4">
               <Popover
                 trigger={
@@ -112,6 +134,25 @@ function AppContent() {
                 align="end"
                 content={<TagManagement />}
               />
+              {!location.pathname.endsWith("/archive") && (
+                <>
+                  <FilterPopover
+                    users={users}
+                    tags={tags}
+                    filters={filters}
+                    onFilterChange={setFilters}
+                    hasActiveFilters={hasActiveFilters}
+                    onClearFilters={clearFilters}
+                  />
+                  <button
+                    onClick={() => navigate(`/board/${boardId}/archive`)}
+                    className="flex items-center gap-2 px-3 py-2 text-gray-700 hover:bg-gray-100 rounded-lg transition-colors"
+                  >
+                    <Archive className="h-5 w-5" />
+                    <span className="text-sm font-medium">Archive</span>
+                  </button>
+                </>
+              )}
               <button
                 onClick={signOut}
                 className="flex items-center gap-2 px-3 py-2 text-red-600 hover:bg-red-100 rounded-lg transition-colors"
@@ -121,52 +162,26 @@ function AppContent() {
               </button>
             </div>
           </div>
-
-          <div className="flex items-center gap-4 w-full">
-            <select
-              value={currentBoardId}
-              onChange={(e) => setCurrentBoardId(e.target.value)}
-              className="flex-grow px-3 py-1.5 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
-            >
-              {boards.map((board) => (
-                <option key={board.id} value={board.id}>
-                  {board.name}
-                </option>
-              ))}
-            </select>
-            <div className="flex gap-2">
-              <input
-                type="text"
-                value={newBoardName}
-                onChange={(e) => setNewBoardName(e.target.value)}
-                placeholder="New board name..."
-                className="px-3 py-1.5 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
-                onKeyPress={(e) => {
-                  if (e.key === "Enter") {
-                    handleAddBoard();
-                  }
-                }}
-              />
-              <button
-                onClick={handleAddBoard}
-                className="flex items-center gap-2 px-3 py-1.5 bg-blue-500 text-white rounded-lg hover:bg-blue-600"
-              >
-                <Layout size={18} />
-                Add Board
-              </button>
-            </div>
-          </div>
         </div>
 
-        {currentBoardId && (
-          <Board
-            boardId={currentBoardId}
-            users={users}
-            tags={tags}
-            onTaskClick={setSelectedTaskId}
-            onTaskCreated={handleTaskCreated}
-          />
-        )}
+        {boardId &&
+          (location.pathname.endsWith("/archive") ? (
+            <ArchiveBoard
+              boardId={boardId}
+              users={users}
+              tags={tags}
+              onTaskClick={setSelectedTaskId}
+            />
+          ) : (
+            <Board
+              boardId={boardId}
+              users={users}
+              tags={tags}
+              onTaskClick={setSelectedTaskId}
+              onTaskCreated={handleTaskCreated}
+              filterTasks={filterTasks}
+            />
+          ))}
       </div>
 
       {selectedTaskId && (
@@ -174,7 +189,7 @@ function AppContent() {
           taskId={selectedTaskId}
           users={users}
           tags={tags}
-          boardId={currentBoardId}
+          boardId={boardId}
           onClose={() => setSelectedTaskId(null)}
         />
       )}
@@ -190,7 +205,23 @@ function App() {
           <Routes>
             <Route path="/login" element={<Login />} />
             <Route
-              path="/*"
+              path="/"
+              element={
+                <ProtectedRoute>
+                  <BoardIndex />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/board/:boardId"
+              element={
+                <ProtectedRoute>
+                  <AppContent />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/board/:boardId/archive"
               element={
                 <ProtectedRoute>
                   <AppContent />

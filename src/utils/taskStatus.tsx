@@ -10,43 +10,38 @@ interface StatusTransition {
   title: string;
 }
 
-export const STATUS_TRANSITIONS: Record<Task["status"], StatusTransition> = {
+export const TASK_STATUSES = {
   pending: {
-    nextStatus: "started",
     icon: Play,
-    label: "Start Task",
-    color: "blue",
-    title: "Start task",
+    label: "Pending",
+    color: "gray",
+    nextStatus: "started" as const,
   },
   started: {
-    nextStatus: "in_review",
-    icon: Send,
-    label: "Send to Review",
-    color: "orange",
-    title: "Send to review",
+    icon: Play,
+    label: "In Progress",
+    color: "blue",
+    nextStatus: "in_review" as const,
   },
   in_review: {
-    nextStatus: "completed",
-    icon: Check,
-    label: "Complete",
-    color: "green",
-    title: "Mark as completed",
+    icon: Send,
+    label: "In Review",
+    color: "orange",
+    nextStatus: "completed" as const,
   },
   completed: {
-    nextStatus: "archived",
-    icon: Archive,
-    label: "Archive",
-    color: "gray",
-    title: "Archive task",
+    icon: Check,
+    label: "Completed",
+    color: "green",
+    nextStatus: "archived" as const,
   },
   archived: {
-    nextStatus: "archived", // No next status
     icon: Archive,
     label: "Archived",
     color: "gray",
-    title: "Task archived",
+    nextStatus: "archived" as const,
   },
-};
+} as const;
 
 interface GetStatusButtonProps {
   status: Task["status"];
@@ -59,7 +54,7 @@ export function getStatusButton({
   onClick,
   variant = "card",
 }: GetStatusButtonProps) {
-  const transition = STATUS_TRANSITIONS[status];
+  const transition = TASK_STATUSES[status];
   if (!transition || status === "archived") return null;
 
   const { icon: Icon, label, color, title, nextStatus } = transition;
