@@ -1,0 +1,1 @@
+ALTER TYPE task_status ADD VALUE 'archived' AFTER 'completed'; 

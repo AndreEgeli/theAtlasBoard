@@ -12,6 +12,7 @@ import { Trash2 } from "lucide-react";
 import { User } from "lucide-react";
 import { createTodo, updateTodo } from "../api/todos";
 import { useTaskTags } from "../hooks/useTaskTags";
+import { getStatusButton } from "../utils/taskStatus";
 
 interface TaskModalProps {
   boardId: string;
@@ -44,8 +45,6 @@ export function TaskModal({
 
   const taskTags = task?.tags || [];
   const todos = task?.todos || [];
-
-  console.log(taskTags);
 
   const handleAddTodo = async () => {
     if (newTodo.trim()) {
@@ -89,6 +88,13 @@ export function TaskModal({
     } else {
       await addTag(tagId);
     }
+  };
+
+  const handleStatusChange = async (newStatus: Task["status"]) => {
+    await updateTask({
+      id: task!.id,
+      updates: { status: newStatus },
+    });
   };
 
   const completedTodos = todos.filter((todo) => todo.completed).length;
@@ -289,23 +295,17 @@ export function TaskModal({
         </div>
 
         <div className="flex items-center justify-between">
-          <select
-            value={task.status}
-            onChange={(e) =>
-              updateTask({
-                id: task.id,
-                updates: { status: e.target.value as Task["status"] },
-              })
-            }
-            className="px-3 py-1.5 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500"
-          >
-            <option value="pending">Pending</option>
-            <option value="started">Started</option>
-            <option value="in_review">In Review</option>
-            <option value="completed">Completed</option>
-          </select>
+          <div className="flex items-center gap-2">
+            <span className="text-sm text-gray-500">Status:</span>
+            <span className="font-medium capitalize">{task.status}</span>
+          </div>
 
           <div className="flex justify-end gap-2">
+            {getStatusButton({
+              status: task.status,
+              onClick: handleStatusChange,
+              variant: "modal",
+            })}
             <button
               onClick={onClose}
               className="px-4 py-2 text-gray-700 hover:bg-gray-100 rounded"

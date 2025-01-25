@@ -1,4 +1,4 @@
-import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import {
   getBoards,
   createBoard,
@@ -6,36 +6,43 @@ import {
   deleteBoard,
 } from "../api/boards";
 import type { Board } from "../types";
+import { useOptimistic } from "./useOptimistic";
 
 export function useBoards() {
   const queryClient = useQueryClient();
+  const queryKey = ["boards"];
 
   const { data: boards = [], isLoading } = useQuery({
-    queryKey: ["boards"],
+    queryKey,
     queryFn: getBoards,
   });
 
-  const createBoardMutation = useMutation({
+  const createBoardMutation = useOptimistic<Board[], Omit<Board, "id">>({
+    queryKey,
     mutationFn: createBoard,
-    onSuccess: (newBoard) => {
-      queryClient.invalidateQueries({ queryKey: ["boards"] });
-      return newBoard;
-    },
+    updateCache: (oldBoards, newBoard) => [
+      ...oldBoards,
+      { ...newBoard, id: crypto.randomUUID() }, // Temporary ID
+    ],
   });
 
-  const updateBoardMutation = useMutation({
-    mutationFn: ({ id, updates }: { id: string; updates: Partial<Board> }) =>
-      updateBoard(id, updates),
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["boards"] });
-    },
+  const updateBoardMutation = useOptimistic<
+    Board[],
+    { id: string; updates: Partial<Board> }
+  >({
+    queryKey,
+    mutationFn: ({ id, updates }) => updateBoard(id, updates),
+    updateCache: (oldBoards, { id, updates }) =>
+      oldBoards.map((board) =>
+        board.id === id ? { ...board, ...updates } : board
+      ),
   });
 
-  const deleteBoardMutation = useMutation({
+  const deleteBoardMutation = useOptimistic<Board[], string>({
+    queryKey,
     mutationFn: deleteBoard,
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["boards"] });
-    },
+    updateCache: (oldBoards, id) =>
+      oldBoards.filter((board) => board.id !== id),
   });
 
   return {

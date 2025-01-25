@@ -134,7 +134,7 @@ export function Board({
                   onDragOver={handleDragOver}
                   onClick={(e) => handleCellClick(e, { importance, timeframe })}
                   className={`
-                    min-h-[200px] p-4 relative group cursor-pointer
+                    min-h-[200px] p-4 relative group/cell
                     ${
                       i !== importanceLevels.length - 1
                         ? "border-b border-gray-200 border-dashed"
@@ -147,8 +147,8 @@ export function Board({
                     }
                   `}
                 >
-                  <div className="absolute inset-0 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity">
-                    <div className="w-12 h-12 rounded-full bg-blue-500 bg-opacity-10 flex items-center justify-center">
+                  <div className="absolute inset-0 flex items-center justify-center opacity-0 group-hover/cell:opacity-100 transition-opacity pointer-events-auto group-hover/task:opacity-0 group-hover/task:pointer-events-none">
+                    <div className="w-12 h-12 rounded-full bg-blue-500 bg-opacity-10 flex items-center justify-center cursor-pointer hover:bg-opacity-20">
                       <Plus className="text-blue-500" />
                     </div>
                   </div>
@@ -168,7 +168,7 @@ export function Board({
                           setDragOverTaskId(task.id);
                         }}
                         onDrop={(e) => handleTaskDrop(e, task.id)}
-                        className={`relative task-card ${
+                        className={`relative task-card group/task ${
                           dragOverTaskId === task.id ? "opacity-50" : ""
                         }`}
                       >

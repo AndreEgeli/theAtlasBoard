@@ -7,6 +7,8 @@ import {
   Tag,
 } from "../types";
 import { useTasks } from "../hooks/useTasks";
+import { Play, Send, Check, Archive } from "lucide-react";
+import { getStatusButton } from "../utils/taskStatus";
 
 interface TaskCardProps {
   taskId: string;
@@ -23,10 +25,17 @@ export function TaskCard({
   boardId,
   onClick,
 }: TaskCardProps) {
-  const { tasks } = useTasks(boardId);
+  const { tasks, updateTask } = useTasks(boardId);
   const task = tasks.find((t) => t.id === taskId);
 
-  if (!task) {
+  const handleStatusChange = async (newStatus: Task["status"]) => {
+    await updateTask({
+      id: task!.id,
+      updates: { status: newStatus },
+    });
+  };
+
+  if (!task || task.status === "archived") {
     return null;
   }
 
@@ -57,11 +66,17 @@ export function TaskCard({
       draggable
       onDragStart={handleDragStart}
       onClick={onClick}
-      className={`${
-        statusColors[task.status]
-      } p-4 rounded-lg shadow-sm border hover:shadow-md transition-all mb-3`}
+      className={`group/card relative ${
+        statusColors[task.status as keyof typeof statusColors]
+      } p-4 rounded-lg shadow-sm border hover:shadow-md transition-all mb-3 cursor-pointer`}
     >
-      <div className="flex items-start justify-between gap-3">
+      {getStatusButton({
+        status: task.status,
+        onClick: handleStatusChange,
+        variant: "card",
+      })}
+
+      <div className="flex items-start justify-between gap-3 pr-10">
         <h3 className="font-medium text-gray-800 flex-1">{task.title}</h3>
         {assignedUser && (
           <div className="flex-shrink-0">

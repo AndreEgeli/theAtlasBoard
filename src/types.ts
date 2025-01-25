@@ -25,7 +25,7 @@ export interface Task {
   tags: string[];
   importance: "not critical" | "critical" | "super critical";
   timeframe: ">3 hours" | "> 1 day" | "> 1 week";
-  status: "pending" | "started" | "in_review" | "completed";
+  status: "pending" | "started" | "in_review" | "completed" | "archived";
   todos: TodoItem[];
   order?: number;
 }

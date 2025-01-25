@@ -1,13 +1,15 @@
-import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { createTask, updateTask, moveTask, deleteTask } from "../api/tasks";
 import type { Task, CellPosition } from "../types";
 import { supabase } from "../lib/supabase";
+import { useOptimistic } from "./useOptimistic";
 
 export function useTasks(boardId: string) {
   const queryClient = useQueryClient();
+  const queryKey = ["tasks", boardId];
 
   const { data: tasks = [], isLoading } = useQuery({
-    queryKey: ["tasks", boardId],
+    queryKey,
     queryFn: async () => {
       const { data, error } = await supabase
         .from("tasks")
@@ -31,35 +33,57 @@ export function useTasks(boardId: string) {
     enabled: !!boardId,
   });
 
-  const createTaskMutation = useMutation({
-    mutationFn: (task: Omit<Task, "id">) => createTask(boardId, task),
-    onSuccess: (newTask) => {
-      queryClient.invalidateQueries({ queryKey: ["tasks", boardId] });
-      return newTask.id;
-    },
+  const createTaskMutation = useOptimistic<Task[], Omit<Task, "id">>({
+    queryKey,
+    mutationFn: (task) => createTask(boardId, task),
+    updateCache: (oldTasks, newTask) => [
+      ...oldTasks,
+      { ...newTask, id: crypto.randomUUID() },
+    ],
   });
 
-  const updateTaskMutation = useMutation({
-    mutationFn: ({ id, updates }: { id: string; updates: Partial<Task> }) =>
-      updateTask(id, updates),
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["tasks", boardId] });
-    },
+  const updateTaskMutation = useOptimistic<
+    Task[],
+    { id: string; updates: Partial<Task> }
+  >({
+    queryKey,
+    mutationFn: ({ id, updates }) => updateTask(id, updates),
+    updateCache: (oldTasks, { id, updates }) =>
+      oldTasks.map((task) =>
+        task.id === id
+          ? {
+              ...task,
+              ...updates,
+              // Add any specific optimistic update logic here
+              // For example, updating timestamps or derived fields
+            }
+          : task
+      ),
   });
 
-  const moveTaskMutation = useMutation({
-    mutationFn: ({ id, position }: { id: string; position: CellPosition }) =>
-      moveTask(id, position),
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["tasks", boardId] });
-    },
+  const moveTaskMutation = useOptimistic<
+    Task[],
+    { id: string; position: CellPosition }
+  >({
+    queryKey,
+    mutationFn: ({ id, position }) => moveTask(id, position),
+    updateCache: (oldTasks, { id, position }) =>
+      oldTasks.map((task) =>
+        task.id === id
+          ? {
+              ...task,
+              importance: position.importance,
+              timeframe: position.timeframe,
+            }
+          : task
+      ),
   });
 
-  const deleteTaskMutation = useMutation({
+  const deleteTaskMutation = useOptimistic<Task[], string>({
+    queryKey,
     mutationFn: deleteTask,
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["tasks", boardId] });
-    },
+    updateCache: (oldTasks, id) => oldTasks.filter((task) => task.id !== id),
+    invalidateOnSuccess: false,
   });
 
   return {

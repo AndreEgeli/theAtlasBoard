@@ -1,4 +1,4 @@
-import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import {
   getTags,
   createTag,
@@ -7,52 +7,65 @@ import {
   removeTagFromTask,
 } from "../api/tags";
 import type { Tag } from "../types";
+import { useOptimistic } from "./useOptimistic";
 
 export function useTags() {
   const queryClient = useQueryClient();
+  const queryKey = ["tags"];
 
   const { data: tags = [], isLoading } = useQuery({
-    queryKey: ["tags"],
+    queryKey,
     queryFn: getTags,
   });
 
-  const createTagMutation = useMutation({
-    mutationFn: (tag: Omit<Tag, "id">) => createTag(tag),
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["tags"] });
-    },
+  const createTagMutation = useOptimistic<Tag[], Omit<Tag, "id">>({
+    queryKey,
+    mutationFn: createTag,
+    updateCache: (oldTags, newTag) => [
+      ...oldTags,
+      { ...newTag, id: crypto.randomUUID() },
+    ],
   });
 
-  const deleteTagMutation = useMutation({
+  const deleteTagMutation = useOptimistic<Tag[], string>({
+    queryKey,
     mutationFn: deleteTag,
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["tags"] });
-    },
+    updateCache: (oldTags, id) => oldTags.filter((tag) => tag.id !== id),
   });
 
-  const addTagToTaskMutation = useMutation({
-    mutationFn: ({ taskId, tagId }: { taskId: string; tagId: string }) =>
-      addTagToTask(taskId, tagId),
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["tasks"] });
-    },
+  const addTagToTaskMutation = useOptimistic<
+    Tag[],
+    { taskId: string; tagId: string }
+  >({
+    queryKey: ["tasks"],
+    mutationFn: ({ taskId, tagId }) => addTagToTask(taskId, tagId),
+    updateCache: (oldTasks, { taskId, tagId }) =>
+      oldTasks.map((task) =>
+        task.id === taskId ? { ...task, tags: [...task.tags, tagId] } : task
+      ),
   });
 
-  const removeTagFromTaskMutation = useMutation({
-    mutationFn: ({ taskId, tagId }: { taskId: string; tagId: string }) =>
-      removeTagFromTask(taskId, tagId),
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["tasks"] });
-    },
+  const removeTagFromTaskMutation = useOptimistic<
+    Tag[],
+    { taskId: string; tagId: string }
+  >({
+    queryKey: ["tasks"],
+    mutationFn: ({ taskId, tagId }) => removeTagFromTask(taskId, tagId),
+    updateCache: (oldTasks, { taskId, tagId }) =>
+      oldTasks.map((task) =>
+        task.id === taskId
+          ? { ...task, tags: task.tags.filter((id) => id !== tagId) }
+          : task
+      ),
   });
 
   return {
     tags,
     isLoading,
-    createTag: createTagMutation.mutate,
-    deleteTag: deleteTagMutation.mutate,
-    addTagToTask: addTagToTaskMutation.mutate,
-    removeTagFromTask: removeTagFromTaskMutation.mutate,
+    createTag: createTagMutation.mutateAsync,
+    deleteTag: deleteTagMutation.mutateAsync,
+    addTagToTask: addTagToTaskMutation.mutateAsync,
+    removeTagFromTask: removeTagFromTaskMutation.mutateAsync,
     isCreating: createTagMutation.isPending,
     isDeleting: deleteTagMutation.isPending,
   };

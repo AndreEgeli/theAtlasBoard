@@ -1,24 +1,30 @@
-import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { addTagToTask, removeTagFromTask } from "../api/tags";
+import { useOptimistic } from "./useOptimistic";
+import type { Task } from "../types";
 
 export function useTaskTags(taskId: string) {
   const queryClient = useQueryClient();
+  const queryKey = ["tasks"];
 
-  const addTagMutation = useMutation({
+  const addTagMutation = useOptimistic<Task[], string>({
+    queryKey,
     mutationFn: (tagId: string) => addTagToTask(taskId, tagId),
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["tasks"] });
-      queryClient.invalidateQueries({ queryKey: ["task-tags", taskId] });
-      console.log("added tag");
-    },
+    updateCache: (oldTasks, tagId) =>
+      oldTasks.map((task) =>
+        task.id === taskId ? { ...task, tags: [...task.tags, tagId] } : task
+      ),
   });
 
-  const removeTagMutation = useMutation({
+  const removeTagMutation = useOptimistic<Task[], string>({
+    queryKey,
     mutationFn: (tagId: string) => removeTagFromTask(taskId, tagId),
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["tasks"] });
-      queryClient.invalidateQueries({ queryKey: ["task-tags", taskId] });
-    },
+    updateCache: (oldTasks, tagId) =>
+      oldTasks.map((task) =>
+        task.id === taskId
+          ? { ...task, tags: task.tags.filter((id) => id !== tagId) }
+          : task
+      ),
   });
 
   return {

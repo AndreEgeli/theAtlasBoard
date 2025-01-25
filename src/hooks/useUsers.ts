@@ -1,32 +1,37 @@
-import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { getUsers, createUser, deleteUser } from "../api/users";
 import type { User } from "../types";
+import { useOptimistic } from "./useOptimistic";
 
 export function useUsers() {
   const queryClient = useQueryClient();
+  const queryKey = ["users"];
 
   const {
     data: users = [],
     isLoading,
     error,
   } = useQuery({
-    queryKey: ["users"],
+    queryKey,
     queryFn: getUsers,
   });
 
-  const createUserMutation = useMutation({
-    mutationFn: (user: Omit<User, "id"> & { avatarFile?: File }) =>
-      createUser(user),
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["users"] });
-    },
+  const createUserMutation = useOptimistic<
+    User[],
+    Omit<User, "id"> & { avatarFile?: File }
+  >({
+    queryKey,
+    mutationFn: createUser,
+    updateCache: (oldUsers, newUser) => [
+      ...oldUsers,
+      { ...newUser, id: crypto.randomUUID() },
+    ],
   });
 
-  const deleteUserMutation = useMutation({
+  const deleteUserMutation = useOptimistic<User[], string>({
+    queryKey,
     mutationFn: deleteUser,
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["users"] });
-    },
+    updateCache: (oldUsers, id) => oldUsers.filter((user) => user.id !== id),
   });
 
   return {

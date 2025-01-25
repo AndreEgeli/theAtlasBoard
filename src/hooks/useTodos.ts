@@ -1,39 +1,55 @@
-import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { createTodo, updateTodo, deleteTodo } from "../api/todos";
 import type { TodoItem } from "../types";
+import { useOptimistic } from "./useOptimistic";
 
 export function useTodos(taskId: string) {
   const queryClient = useQueryClient();
+  const queryKey = ["tasks"];
 
-  const addTodoMutation = useMutation({
-    mutationFn: (todo: Omit<TodoItem, "id">) => createTodo(taskId, todo),
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["tasks"] });
-      queryClient.invalidateQueries({ queryKey: ["todos", taskId] });
-    },
+  const addTodoMutation = useOptimistic<TodoItem[], Omit<TodoItem, "id">>({
+    queryKey,
+    mutationFn: (todo) => createTodo(taskId, todo),
+    updateCache: (oldTasks, newTodo) =>
+      oldTasks.map((task) =>
+        task.id === taskId
+          ? {
+              ...task,
+              todos: [...task.todos, { ...newTodo, id: crypto.randomUUID() }],
+            }
+          : task
+      ),
   });
 
-  const toggleTodoMutation = useMutation({
-    mutationFn: ({ id, completed }: { id: string; completed: boolean }) =>
-      updateTodo(id, { completed }),
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["tasks"] });
-      queryClient.invalidateQueries({ queryKey: ["todos", taskId] });
-    },
+  const toggleTodoMutation = useOptimistic<
+    TodoItem[],
+    { id: string; completed: boolean }
+  >({
+    queryKey,
+    mutationFn: ({ id, completed }) => updateTodo(id, { completed }),
+    updateCache: (oldTasks, { id, completed }) =>
+      oldTasks.map((task) => ({
+        ...task,
+        todos: task.todos.map((todo) =>
+          todo.id === id ? { ...todo, completed } : todo
+        ),
+      })),
   });
 
-  const deleteTodoMutation = useMutation({
-    mutationFn: (todoId: string) => deleteTodo(todoId),
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["tasks"] });
-      queryClient.invalidateQueries({ queryKey: ["todos", taskId] });
-    },
+  const deleteTodoMutation = useOptimistic<TodoItem[], string>({
+    queryKey,
+    mutationFn: deleteTodo,
+    updateCache: (oldTasks, todoId) =>
+      oldTasks.map((task) => ({
+        ...task,
+        todos: task.todos.filter((todo) => todo.id !== todoId),
+      })),
   });
 
   return {
-    addTodo: addTodoMutation.mutate,
-    toggleTodo: toggleTodoMutation.mutate,
-    deleteTodo: deleteTodoMutation.mutate,
+    addTodo: addTodoMutation.mutateAsync,
+    toggleTodo: toggleTodoMutation.mutateAsync,
+    deleteTodo: deleteTodoMutation.mutateAsync,
     isAdding: addTodoMutation.isPending,
     isUpdating: toggleTodoMutation.isPending,
     isDeleting: deleteTodoMutation.isPending,
