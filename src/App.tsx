@@ -16,6 +16,7 @@ import {
   UserIcon,
   Archive,
   ArrowLeft,
+  HomeIcon,
 } from "lucide-react";
 import React, { useEffect, useState } from "react";
 import { Board } from "./components/Board";
@@ -98,6 +99,10 @@ function AppContent() {
         <div className="mb-8 space-y-6">
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-4">
+              <HomeIcon
+                onClick={() => navigate("/")}
+                className="cursor-pointer"
+              />
               {location.pathname.endsWith("/archive") && (
                 <button
                   onClick={() => navigate(`/board/${boardId}`)}
@@ -110,7 +115,7 @@ function AppContent() {
               <h1 className="text-3xl font-bold text-gray-900">
                 {location.pathname.endsWith("/archive")
                   ? "Archive"
-                  : "Task Planning Board"}
+                  : board?.name ?? "Planning Board"}
               </h1>
             </div>
             <div className="flex items-center gap-4">
