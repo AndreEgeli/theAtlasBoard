@@ -1,5 +1,5 @@
-import { useTasks } from "../hooks/useTasks";
-import { User, Tag } from "../types";
+import { useTasks } from "../../hooks/useTasks";
+import { User, Tag } from "../../types";
 import { TaskCard } from "./TaskCard";
 import { Trash2, Archive } from "lucide-react";
 

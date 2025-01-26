@@ -18,9 +18,12 @@ export function useBoards() {
     queryFn: getBoards,
   });
 
-  const createBoardMutation = useOptimistic<Board[], { name: string }>({
+  const createBoardMutation = useOptimistic<
+    Board[],
+    { name: string; teamId: string }
+  >({
     queryKey,
-    mutationFn: ({ name }) => createBoard(name),
+    mutationFn: ({ name, teamId }) => createBoard({ name, teamId }),
     updateCache: (oldBoards, newBoard) => [
       ...oldBoards,
       {

@@ -1,18 +1,18 @@
 import React, { useState } from "react";
-import { useTasks } from "../hooks/useTasks";
-import { useTodos } from "../hooks/useTodos";
+import { useTasks } from "../../hooks/useTasks";
+import { useTodos } from "../../hooks/useTodos";
 import type {
   Task,
   TodoItem,
   User as UserType,
   Tag as TagType,
-} from "../types";
+} from "../../types";
 import { Check, Plus, Tag, X } from "lucide-react";
 import { Trash2 } from "lucide-react";
 import { User } from "lucide-react";
-import { createTodo, updateTodo } from "../api/todos";
-import { useTaskTags } from "../hooks/useTaskTags";
-import { getStatusButton } from "../utils/taskStatus";
+import { createTodo, updateTodo } from "../../api/todos";
+import { useTaskTags } from "../../hooks/useTaskTags";
+import { getStatusButton } from "../../utils/taskStatus";
 
 interface TaskModalProps {
   boardId: string;

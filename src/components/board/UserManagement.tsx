@@ -1,7 +1,7 @@
 import React, { useRef, useState } from "react";
 import { UserPlus, X, Upload } from "lucide-react";
-import { useAuth } from "../contexts/AuthContext";
-import { useUsers } from "../hooks/useUsers";
+import { useAuth } from "../../contexts/AuthContext";
+import { useUsers } from "../../hooks/useUsers";
 
 export function UserManagement() {
   const { users, createUser, deleteUser, isCreating, isDeleting } = useUsers();
