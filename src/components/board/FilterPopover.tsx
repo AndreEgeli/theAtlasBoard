@@ -1,7 +1,7 @@
 import { Filter, X, Search } from "lucide-react";
 import { Popover } from "./Popover";
-import type { Task, User, Tag } from "../types";
-import { TASK_STATUSES } from "../utils/taskStatus";
+import type { Task, User, Tag } from "../../types";
+import { TASK_STATUSES } from "../../utils/taskStatus";
 import { useState } from "react";
 
 interface FilterSection {

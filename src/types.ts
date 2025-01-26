@@ -41,3 +41,34 @@ export interface CellPosition {
   importance: Task["importance"];
   timeframe: Task["timeframe"];
 }
+
+export interface Organization {
+  id: string;
+  name: string;
+  created_at: string;
+  created_by: string;
+}
+
+export interface Team {
+  id: string;
+  name: string;
+  organization_id: string;
+  is_org_wide: boolean;
+  created_at: string;
+}
+
+export interface OrganizationMember {
+  organization_id: string;
+  user_id: string;
+  role: "owner" | "admin" | "member";
+  created_at: string;
+}
+
+export interface OrganizationInvite {
+  id: string;
+  organization_id: string;
+  token: string;
+  email?: string;
+  created_at: string;
+  expires_at: string;
+}

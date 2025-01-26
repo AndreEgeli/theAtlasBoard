@@ -1,8 +1,8 @@
 import React, { useState } from "react";
-import { Task, CellPosition, User, Tag } from "../types";
+import { Task, CellPosition, User, Tag } from "../../types";
 import { TaskCard } from "./TaskCard";
 import { Plus } from "lucide-react";
-import { useTasks } from "../hooks/useTasks";
+import { useTasks } from "../../hooks/useTasks";
 
 const importanceLevels: Task["importance"][] = [
   "super critical",

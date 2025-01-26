@@ -1,11 +1,24 @@
 import { supabase } from "../lib/supabase";
 import type { Board } from "../types";
-import { getCurrentUserId } from "../utils/auth";
 
 export async function getBoards() {
   const { data, error } = await supabase
     .from("boards")
-    .select("id, name, created_at")
+    .select(
+      `
+      id, 
+      name, 
+      created_at,
+      team:teams (
+        id,
+        name,
+        organization:organizations (
+          id,
+          name
+        )
+      )
+    `
+    )
     .order("created_at");
 
   if (error) throw error;
@@ -38,11 +51,16 @@ export async function getBoardDetails(boardId: string) {
   };
 }
 
-export async function createBoard(name: string) {
-  const userId = await getCurrentUserId();
+export async function createBoard({
+  name,
+  teamId,
+}: {
+  name: string;
+  teamId: string;
+}) {
   const { data, error } = await supabase
     .from("boards")
-    .insert({ name, user_id: userId })
+    .insert({ name, team_id: teamId })
     .select()
     .single();
 

@@ -5,10 +5,9 @@ import {
   Tag as TagType,
   TodoItem,
   Tag,
-} from "../types";
-import { useTasks } from "../hooks/useTasks";
-import { Play, Send, Check, Archive } from "lucide-react";
-import { getStatusButton } from "../utils/taskStatus";
+} from "../../types";
+import { useTasks } from "../../hooks/useTasks";
+import { getStatusButton } from "../../utils/taskStatus";
 
 interface TaskCardProps {
   taskId: string;

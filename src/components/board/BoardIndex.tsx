@@ -1,10 +1,12 @@
-import { useBoards } from "../hooks/useBoards";
+import { useBoards } from "../../hooks/useBoards";
 import { Layout, Plus, ArrowRight } from "lucide-react";
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
+import { useOrganization } from "../../contexts/OrganizationContext";
 
 export function BoardIndex() {
   const { boards, createBoard, isCreating } = useBoards();
+  const { currentOrganization } = useOrganization();
   const [newBoardName, setNewBoardName] = useState("");
   const navigate = useNavigate();
 
