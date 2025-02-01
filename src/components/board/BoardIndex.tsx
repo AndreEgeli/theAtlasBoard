@@ -4,9 +4,8 @@ import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { useOrganization } from "../../contexts/OrganizationContext";
 
-export function BoardIndex() {
+export const BoardIndex = () => {
   const { boards, createBoard, isCreating } = useBoards();
-  const { currentOrganization } = useOrganization();
   const [newBoardName, setNewBoardName] = useState("");
   const navigate = useNavigate();
 
@@ -86,4 +85,4 @@ export function BoardIndex() {
       </div>
     </div>
   );
-}
+};

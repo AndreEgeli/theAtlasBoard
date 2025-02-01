@@ -1,6 +1,8 @@
-import { createContext, useContext, useState } from "react";
+import { createContext, useContext, useState, useEffect } from "react";
+import { useNavigate } from "react-router-dom";
 import { Organization, Team, OrganizationMember } from "../types";
 import { useOrganizations } from "../hooks/useOrganizations";
+import { useAuth } from "./AuthContext";
 
 interface OrganizationContextType {
   currentOrganization: Organization | null;
@@ -12,14 +14,38 @@ interface OrganizationContextType {
 
 const OrganizationContext = createContext<OrganizationContextType | null>(null);
 
-export function OrganizationProvider({
+export const OrganizationProvider = ({
   children,
 }: {
   children: React.ReactNode;
-}) {
+}) => {
   const [currentOrganization, setCurrentOrganization] =
     useState<Organization | null>(null);
-  const { teams, members, isLoading } = useOrganizations();
+  const { teams, members, isLoading, organizations } = useOrganizations();
+  const navigate = useNavigate();
+  const { user } = useAuth();
+
+  useEffect(() => {
+    // If we have organizations but no current one selected, select the first one
+    if (!isLoading && organizations?.length > 0 && !currentOrganization) {
+      setCurrentOrganization(organizations[0]);
+    }
+
+    // If we have no organizations after loading, redirect to post-signup
+    if (!isLoading && organizations?.length === 0) {
+      navigate("/post-signup", { replace: true });
+    }
+  }, [isLoading, organizations, currentOrganization, navigate]);
+
+  // Show loading state while we determine organization status
+  if (isLoading) {
+    return <div>Loading...</div>;
+  }
+
+  // Don't render children until we have an organization
+  if (!currentOrganization) {
+    return null;
+  }
 
   return (
     <OrganizationContext.Provider
@@ -34,7 +60,7 @@ export function OrganizationProvider({
       {children}
     </OrganizationContext.Provider>
   );
-}
+};
 
 export const useOrganization = () => {
   const context = useContext(OrganizationContext);

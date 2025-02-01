@@ -11,7 +11,7 @@ import { useUsers } from "../../hooks/useUsers";
 import { useTags } from "../../hooks/useTags";
 import { useFiltering } from "../../hooks/useFiltering";
 
-export function BoardWrapper() {
+export const BoardWrapper = () => {
   const { boardId } = useParams();
   const {
     board,
@@ -117,4 +117,4 @@ export function BoardWrapper() {
       )}
     </div>
   );
-}
+};

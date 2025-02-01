@@ -4,7 +4,6 @@ import { useOrganization } from "../../contexts/OrganizationContext";
 import {
   LayoutGrid,
   Users,
-  Settings,
   UserCircle,
   ChevronLeft,
   ChevronRight,

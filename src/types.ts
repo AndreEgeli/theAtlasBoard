@@ -1,50 +1,71 @@
+export type TaskStatus =
+  | "pending"
+  | "started"
+  | "in_review"
+  | "completed"
+  | "archived";
+
+export type TeamRole = "owner" | "editor" | "viewer";
+
+export type OrgRole = "owner" | "admin" | "member";
+
 export interface User {
   id: string;
   name: string;
+  email: string;
   avatar?: string;
+  created_at: string;
 }
 
 export interface TodoItem {
   id: string;
-  text: string;
-  completed: boolean;
   task_id: string;
+  title: string;
+  is_completed: boolean;
+  created_at: string;
+  created_by: string;
 }
 
 export interface Tag {
   id: string;
   name: string;
   color: string;
+  organization_id: string;
 }
 
 export interface Task {
   id: string;
+  board_id: string;
   title: string;
-  description: string;
-  assignee?: string;
-  tags: string[];
-  importance: "not critical" | "critical" | "super critical";
-  timeframe: ">3 hours" | "> 1 day" | "> 1 week";
-  status: "pending" | "started" | "in_review" | "completed" | "archived";
-  todos: TodoItem[];
-  order?: number;
+  description?: string;
+  assignee_id?: string;
+  x_index: number;
+  y_index: number;
+  status: TaskStatus;
+  deadline_at?: string;
+  order: number;
+  created_at: string;
+  created_by: string;
 }
 
 export interface Board {
   id: string;
   name: string;
-  tasks: Task[];
+  team_id: string;
+  is_private: boolean;
   created_at: string;
+  created_by: string;
 }
 
 export interface CellPosition {
-  importance: Task["importance"];
-  timeframe: Task["timeframe"];
+  x_index: Task["x_index"];
+  y_index: Task["y_index"];
 }
 
 export interface Organization {
   id: string;
   name: string;
+  slug: string;
   created_at: string;
   created_by: string;
 }
@@ -52,15 +73,24 @@ export interface Organization {
 export interface Team {
   id: string;
   name: string;
+  slug: string;
   organization_id: string;
   is_org_wide: boolean;
+  created_at: string;
+  created_by: string;
+}
+
+export interface TeamMember {
+  team_id: string;
+  user_id: string;
+  role: TeamRole;
   created_at: string;
 }
 
 export interface OrganizationMember {
   organization_id: string;
   user_id: string;
-  role: "owner" | "admin" | "member";
+  role: OrgRole;
   created_at: string;
 }
 
@@ -68,7 +98,9 @@ export interface OrganizationInvite {
   id: string;
   organization_id: string;
   token: string;
-  email?: string;
+  email: string;
+  role: OrganizationMember["role"];
   created_at: string;
   expires_at: string;
+  created_by: string;
 }
