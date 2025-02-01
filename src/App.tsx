@@ -9,8 +9,10 @@ import { TeamManagement } from "./components/organization/TeamManagement";
 import { OrganizationSettings } from "./components/organization/OrganizationSettings";
 import { UserProfile } from "./components/profile/UserProfile";
 import { PostSignupFlow } from "./pages/PostSignup";
-import { Login } from "./pages/Login";
 import { useAuth } from "./contexts/AuthContext";
+import LoginPage from "./pages/LoginPage";
+import { useEffect } from "react";
+import { useNavigate } from "react-router-dom";
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -24,13 +26,27 @@ const queryClient = new QueryClient({
 // Create a protected route wrapper component
 function ProtectedRoute({ children }: { children: React.ReactNode }) {
   const { user, loading } = useAuth();
+  const navigate = useNavigate();
+
+  useEffect(() => {
+    if (!loading && !user) {
+      navigate("/login");
+    }
+  }, [user, loading, navigate]);
 
   if (loading) {
-    return <div>Loading...</div>;
+    return (
+      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-gray-900 mx-auto"></div>
+          <p className="mt-4 text-gray-600">Loading...</p>
+        </div>
+      </div>
+    );
   }
 
   if (!user) {
-    return <Navigate to="/login" replace />;
+    return null; // Will redirect in useEffect
   }
 
   return <>{children}</>;
@@ -52,7 +68,7 @@ export default function App() {
         <AuthProvider>
           <Routes>
             {/* Public routes */}
-            <Route path="/login" element={<Login />} />
+            <Route path="/login" element={<LoginPage />} />
 
             {/* Protected but pre-organization routes */}
             <Route

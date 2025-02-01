@@ -17,7 +17,7 @@ export function AppLayout() {
   const location = useLocation();
 
   if (!currentOrganization) {
-    return <Navigate to="/create-organization" replace />;
+    return <Navigate to="/post-signup" replace />;
   }
 
   const navItems = [

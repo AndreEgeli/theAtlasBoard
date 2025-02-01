@@ -2,14 +2,13 @@ import React, { createContext, useContext, useEffect, useState } from "react";
 import { supabase } from "../lib/supabase";
 import type { AuthUser, AuthError } from "../types/auth";
 import { useNavigate } from "react-router-dom";
-import { Provider } from "@supabase/supabase-js";
 
 interface AuthContextType {
   user: AuthUser | null;
   loading: boolean;
   error: AuthError | null;
   signIn: (email: string, password: string) => Promise<void>;
-  signUp: (email: string, password: string) => Promise<void>;
+  signUp: (email: string, password: string, name?: string) => Promise<void>;
   signOut: () => Promise<void>;
   signInWithGithub: () => Promise<void>;
 }
@@ -22,43 +21,93 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
   const [error, setError] = useState<AuthError | null>(null);
   const navigate = useNavigate();
 
-  useEffect(() => {
-    // Check active sessions and sets the user
-    supabase.auth.getSession().then(({ data: { session } }) => {
-      setUser(session?.user ?? null);
-      setLoading(false);
-    });
+  // Helper function to check if user has any organizations
+  const checkUserOrganizations = async (userId: string) => {
+    const { data: orgMemberships, error } = await supabase
+      .from("organization_members")
+      .select("organization_id")
+      .eq("user_id", userId)
+      .limit(1);
 
-    // Listen for changes on auth state
+    if (error) {
+      console.error("Error checking organizations:", error);
+      return false;
+    }
+
+    return orgMemberships && orgMemberships.length > 0;
+  };
+
+  useEffect(() => {
+    const checkSession = async () => {
+      try {
+        const {
+          data: { session },
+          error: sessionError,
+        } = await supabase.auth.getSession();
+        setUser(session?.user ?? null);
+      } catch (error) {
+        navigate("/login");
+        console.error("Session check error:", error);
+        setUser(null);
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    checkSession();
+
     const {
       data: { subscription },
-    } = supabase.auth.onAuthStateChange((_event, session) => {
+    } = supabase.auth.onAuthStateChange(async (_event, session) => {
+      console.log("Auth state changed:", _event, session?.user?.id);
+
       setUser(session?.user ?? null);
       setLoading(false);
     });
 
     return () => subscription.unsubscribe();
-  }, []);
+  }, [navigate]);
 
   const signIn = async (email: string, password: string) => {
+    setLoading(true);
     try {
-      const { error } = await supabase.auth.signInWithPassword({
+      const { data, error } = await supabase.auth.signInWithPassword({
         email,
         password,
       });
       if (error) throw error;
+
+      // First check if user exists in organization_members
+      const hasOrg = await checkUserOrganizations(data.user.id);
+
+      setUser(data.user);
+
+      if (!hasOrg) {
+        navigate("/post-signup");
+      } else {
+        navigate("/");
+      }
     } catch (error) {
       setError(error as AuthError);
       throw error;
+    } finally {
+      setLoading(false);
     }
   };
 
-  const signUp = async (email: string, password: string) => {
+  const signUp = async (email: string, password: string, name?: string) => {
+    setLoading(true);
     try {
       const { data, error } = await supabase.auth.signUp({
         email,
         password,
+        options: {
+          data: {
+            full_name: name,
+          },
+        },
       });
+
       if (error) throw error;
 
       setUser(data?.user ?? null);
@@ -66,16 +115,24 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
     } catch (error) {
       setError(error as AuthError);
       throw error;
+    } finally {
+      setLoading(false);
     }
   };
 
   const signOut = async () => {
+    setLoading(true);
     try {
       const { error } = await supabase.auth.signOut();
       if (error) throw error;
+
+      setUser(null);
+      navigate("/login");
     } catch (error) {
       setError(error as AuthError);
       throw error;
+    } finally {
+      setLoading(false);
     }
   };
 

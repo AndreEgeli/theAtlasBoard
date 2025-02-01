@@ -94,13 +94,15 @@ export interface OrganizationMember {
   created_at: string;
 }
 
-export interface OrganizationInvite {
+export interface PendingInvite {
   id: string;
   organization_id: string;
+  organization_name: string;
+  role: OrgRole;
   token: string;
-  email: string;
-  role: OrganizationMember["role"];
   created_at: string;
   expires_at: string;
+  email: string;
+  accepted_at: string | null;
   created_by: string;
 }

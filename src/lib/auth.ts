@@ -1,5 +1,6 @@
 import { supabase } from "./supabase";
 import type { AuthUser } from "../types/auth";
+import { PendingInvite } from "@/types";
 
 export async function signInWithEmail(email: string, password: string) {
   const { data, error } = await supabase.auth.signInWithPassword({
@@ -42,42 +43,16 @@ export function subscribeToAuthChanges(
   });
 }
 
-export interface PendingInvite {
-  id: string;
-  organization_id: string;
-  organization_name: string; // We'll join with organizations table
-  role: "owner" | "admin" | "member";
-  token: string;
-  created_at: string;
-}
-
 // Check for pending invites for a user's email
 export async function getPendingInvites(
   email: string
 ): Promise<PendingInvite[]> {
-  const { data, error } = await supabase
-    .from("organization_invites")
-    .select(
-      `
-      id,
-      organization_id,
-      organizations (
-        name
-      ),
-      role,
-      token,
-      created_at
-    `
-    )
-    .eq("email", email)
-    .is("accepted_at", null)
-    .gt("expires_at", new Date().toISOString());
+  const { data, error } = await supabase.rpc("get_pending_invites", {
+    email_address: email,
+  });
 
   if (error) throw error;
-  return data.map((invite) => ({
-    ...invite,
-    organization_name: invite.organizations.name,
-  }));
+  return data;
 }
 
 // Accept an invite

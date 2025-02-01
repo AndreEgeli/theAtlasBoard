@@ -6,21 +6,34 @@ import {
   acceptInvite,
   createOrganization,
 } from "../lib/auth";
-import type { PendingInvite } from "../lib/auth";
+import type { PendingInvite } from "../types";
 
 export function PostSignupFlow() {
-  const { user } = useAuth();
+  const { user, loading: authLoading } = useAuth();
   const navigate = useNavigate();
   const [invites, setInvites] = useState<PendingInvite[]>([]);
   const [loading, setLoading] = useState(true);
-  const [orgName, setOrgName] = useState("");
   const [creating, setCreating] = useState(false);
+  const [orgName, setOrgName] = useState("");
+  const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
-    if (user?.email) {
-      loadInvites();
+    // If auth is still loading, wait
+    if (authLoading) return;
+
+    // If no user after auth loading completes, redirect to login
+    if (!user) {
+      navigate("/login");
+      return;
     }
-  }, [user?.email]);
+
+    // Only load invites if we have a user email
+    if (user.email) {
+      loadInvites();
+    } else {
+      setLoading(false);
+    }
+  }, [user, authLoading, navigate]);
 
   const loadInvites = async () => {
     if (!user?.email) return;
@@ -37,7 +50,7 @@ export function PostSignupFlow() {
   const handleAcceptInvite = async (token: string) => {
     try {
       const { organizationId } = await acceptInvite(token);
-      navigate(`/org/${organizationId}`);
+      navigate(`/`);
     } catch (error) {
       console.error("Error accepting invite:", error);
     }
@@ -45,21 +58,34 @@ export function PostSignupFlow() {
 
   const handleCreateOrganization = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!orgName.trim() || creating) return;
+    if (!orgName.trim()) return;
 
     setCreating(true);
+    setError(null);
+
     try {
       const { organizationId } = await createOrganization(orgName.trim());
-      navigate(`/org/${organizationId}`);
-    } catch (error) {
-      console.error("Error creating organization:", error);
+      navigate("/");
+    } catch (err) {
+      setError(
+        err instanceof Error ? err.message : "Failed to create organization"
+      );
+      console.error("Error creating organization:", err);
     } finally {
       setCreating(false);
     }
   };
 
-  if (loading) {
-    return <div>Loading...</div>;
+  // Show loading state while either auth or invites are loading
+  if (authLoading || loading) {
+    return (
+      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-gray-900 mx-auto"></div>
+          <p className="mt-4 text-gray-600">Loading...</p>
+        </div>
+      </div>
+    );
   }
 
   return (
@@ -70,6 +96,9 @@ export function PostSignupFlow() {
           <h2 className="mt-6 text-center text-3xl font-extrabold text-gray-900">
             Create your organization
           </h2>
+          {error && (
+            <div className="mt-2 text-center text-sm text-red-600">{error}</div>
+          )}
           <form className="mt-8 space-y-6" onSubmit={handleCreateOrganization}>
             <div>
               <label
@@ -90,7 +119,7 @@ export function PostSignupFlow() {
             <button
               type="submit"
               disabled={creating}
-              className="w-full flex justify-center py-2 px-4 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500"
+              className="w-full flex justify-center py-2 px-4 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 disabled:opacity-50"
             >
               {creating ? "Creating..." : "Create Organization"}
             </button>
