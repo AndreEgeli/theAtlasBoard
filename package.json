@@ -16,7 +16,8 @@
     "setup": "pnpm install && pnpm setup:supabase",
     "setup:supabase": "node ./scripts/setup-supabase.js",
     "start": "pnpm dev",
-    "clean": "rimraf node_modules pnpm-lock.yaml"
+    "clean": "rimraf node_modules pnpm-lock.yaml",
+    "generate-local-types": "supabase gen types typescript --local > src/types.ts"
   },
   "dependencies": {
     "@radix-ui/react-avatar": "^1.1.2",

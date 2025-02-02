@@ -1,7 +1,7 @@
 import { BaseRepository, TableRecord } from "./BaseRepository";
 import { SupabaseClient } from "@supabase/supabase-js";
 import { Database } from "@/types/supabase";
-import type { CellPosition } from "@/types";
+import type { FullTask, TaskPosition } from "@/types";
 
 type Task = TableRecord<"tasks">;
 
@@ -10,14 +10,15 @@ export class TaskRepository extends BaseRepository<"tasks", Task> {
     super(supabase, "tasks");
   }
 
-  async findByBoard(boardId: string) {
+  async findByBoard(boardId: string): Promise<FullTask[]> {
     const { data, error } = await this.supabase
       .from(this.table)
       .select(
         `
         *,
         todos (*),
-        task_tags (tag_id)
+        task_tags (tag_id),
+        task_assignees (user_id)
       `
       )
       .eq("board_id", boardId)
@@ -26,11 +27,13 @@ export class TaskRepository extends BaseRepository<"tasks", Task> {
     if (error) throw error;
     return data.map((task) => ({
       ...task,
-      tags: task.task_tags.map((tt: any) => tt.tag_id),
+      task_todos: task.todos,
+      task_tags: task.task_tags.map((tt: any) => tt.tag_id),
+      task_assignees: task.task_assignees.map((ta: any) => ta.user_id),
     }));
   }
 
-  async moveTask(id: string, position: CellPosition) {
+  async moveTask(id: string, position: TaskPosition) {
     const { data, error } = await this.supabase
       .from(this.table)
       .update({

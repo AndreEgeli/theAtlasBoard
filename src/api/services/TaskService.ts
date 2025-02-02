@@ -1,6 +1,6 @@
 import { TaskRepository } from "../repositories/TaskRepository";
 import { supabase } from "@/lib/supabase";
-import type { Task, CellPosition } from "@/types";
+import type { Task, TaskPosition } from "@/types";
 
 export class TaskService {
   private taskRepo: TaskRepository;
@@ -29,7 +29,7 @@ export class TaskService {
     return this.taskRepo.update(id, updates);
   }
 
-  async moveTask(id: string, position: CellPosition) {
+  async moveTask(id: string, position: TaskPosition) {
     return this.taskRepo.moveTask(id, position);
   }
 
