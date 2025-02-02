@@ -9,7 +9,7 @@ export class TagRepository extends BaseRepository<"tags", Tag> {
     super(supabase, "tags");
   }
 
-  async findByOrganization(organizationId: string) {
+  async findByOrganization(organizationId: string): Promise<Tag[]> {
     const { data, error } = await this.supabase
       .from(this.table)
       .select("*")
@@ -18,22 +18,5 @@ export class TagRepository extends BaseRepository<"tags", Tag> {
 
     if (error) throw error;
     return data;
-  }
-
-  async addToTask(taskId: string, tagId: string) {
-    const { error } = await this.supabase
-      .from("task_tags")
-      .insert({ task_id: taskId, tag_id: tagId });
-
-    if (error) throw error;
-  }
-
-  async removeFromTask(taskId: string, tagId: string) {
-    const { error } = await this.supabase
-      .from("task_tags")
-      .delete()
-      .match({ task_id: taskId, tag_id: tagId });
-
-    if (error) throw error;
   }
 }

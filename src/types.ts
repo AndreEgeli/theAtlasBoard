@@ -86,3 +86,11 @@ export type TaskAssigneeInsert =
   Database["public"]["Tables"]["task_assignees"]["Insert"];
 export type TaskAssigneeUpdate =
   Database["public"]["Tables"]["task_assignees"]["Update"];
+
+export type Board = Database["public"]["Tables"]["boards"]["Row"];
+export type BoardInsert = Database["public"]["Tables"]["boards"]["Insert"];
+export type BoardUpdate = Database["public"]["Tables"]["boards"]["Update"];
+
+export type FullBoard = Board & {
+  board_tasks: Array<FullTask>;
+};

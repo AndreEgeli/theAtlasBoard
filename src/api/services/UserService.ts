@@ -42,20 +42,6 @@ export class UserService {
     return user;
   }
 
-  async setActiveOrganization(organizationId: string) {
-    const {
-      data: { user },
-      error,
-    } = await supabase.auth.updateUser({
-      data: {
-        active_organization_id: organizationId,
-      },
-    });
-
-    if (error) throw error;
-    return user;
-  }
-
   async checkUserOrganizations(userId: string) {
     const { data: orgMemberships, error } = await supabase
       .from("organization_members")

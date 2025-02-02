@@ -1,6 +1,7 @@
 import { BaseRepository, TableRecord } from "./BaseRepository";
 import { SupabaseClient } from "@supabase/supabase-js";
 import { Database } from "@/types/supabase";
+import { FullBoard } from "@/types";
 
 type Board = TableRecord<"boards">;
 
@@ -34,7 +35,7 @@ export class BoardRepository extends BaseRepository<"boards", Board> {
     return data;
   }
 
-  async findWithDetails(boardId: string) {
+  async findWithDetails(boardId: string): Promise<FullBoard> {
     const { data, error } = await this.supabase
       .from(this.table)
       .select(
@@ -43,7 +44,8 @@ export class BoardRepository extends BaseRepository<"boards", Board> {
         tasks (
           *,
           todos (*),
-          task_tags (tag_id)
+          task_tags (tag_id),
+          task_assignees (user_id)
         )
       `
       )
@@ -53,9 +55,11 @@ export class BoardRepository extends BaseRepository<"boards", Board> {
     if (error) throw error;
     return {
       ...data,
-      tasks: data.tasks.map((task: any) => ({
+      board_tasks: data.tasks.map((task: any) => ({
         ...task,
-        tags: task.task_tags.map((tt: any) => tt.tag_id),
+        task_tags: task.task_tags.map((tt: any) => tt.tag_id),
+        task_assignees: task.task_assignees.map((ta: any) => ta.user_id),
+        task_todos: task.todos,
       })),
     };
   }

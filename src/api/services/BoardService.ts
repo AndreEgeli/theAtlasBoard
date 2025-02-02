@@ -1,4 +1,4 @@
-import { Board } from "@/types";
+import { BoardUpdate } from "@/types";
 import { BoardRepository } from "../repositories/BoardRepository";
 import { supabase } from "@/lib/supabase";
 
@@ -25,7 +25,7 @@ export class BoardService {
     });
   }
 
-  async updateBoard(id: string, updates: Partial<Board>) {
+  async updateBoard(id: string, updates: Partial<BoardUpdate>) {
     return this.boardRepo.update(id, updates);
   }
 

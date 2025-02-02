@@ -1,5 +1,5 @@
 import { useState } from "react";
-import type { Task } from "../types";
+import type { FullTask, Task } from "@/types";
 
 interface FilterState {
   assignees: string[];
@@ -16,7 +16,7 @@ export function useFiltering() {
     showArchived: false,
   });
 
-  const filterTasks = (tasks: Task[]) => {
+  const filterTasks = (tasks: FullTask[]) => {
     return tasks.filter((task) => {
       // First check if we should show archived tasks
       if (task.status === "archived" && !filters.showArchived) {
@@ -25,14 +25,16 @@ export function useFiltering() {
 
       const assigneeMatch =
         filters.assignees.length === 0 ||
-        filters.assignees.includes(task.assignee || "");
+        filters.assignees.includes(task.task_assignees[0].id || "");
 
       const statusMatch =
         filters.statuses.length === 0 || filters.statuses.includes(task.status);
 
       const tagsMatch =
         filters.tags.length === 0 ||
-        filters.tags.some((tagId) => task.tags.includes(tagId));
+        filters.tags.some((tagId) =>
+          task.task_tags.some((tt) => tt.id === tagId)
+        );
 
       return assigneeMatch && statusMatch && tagsMatch;
     });

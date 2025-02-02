@@ -44,34 +44,3 @@ export function useTags() {
     isDeleting: deleteTagMutation.isPending,
   };
 }
-
-export function useTaskTags(taskId: string) {
-  const queryKey = ["tasks"];
-
-  const addTagMutation = useOptimistic<Tag[], string>({
-    queryKey,
-    mutationFn: (tagId) => tagService.addTagToTask(taskId, tagId),
-    updateCache: (oldTasks, tagId) =>
-      oldTasks.map((task) =>
-        task.id === taskId ? { ...task, tags: [...task.tags, tagId] } : task
-      ),
-  });
-
-  const removeTagMutation = useOptimistic<Tag[], string>({
-    queryKey,
-    mutationFn: (tagId) => tagService.removeTagFromTask(taskId, tagId),
-    updateCache: (oldTasks, tagId) =>
-      oldTasks.map((task) =>
-        task.id === taskId
-          ? { ...task, tags: task.tags.filter((id) => id !== tagId) }
-          : task
-      ),
-  });
-
-  return {
-    addTag: addTagMutation.mutateAsync,
-    removeTag: removeTagMutation.mutateAsync,
-    isAdding: addTagMutation.isPending,
-    isRemoving: removeTagMutation.isPending,
-  };
-}

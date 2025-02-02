@@ -1,6 +1,6 @@
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { BoardService } from "../services/BoardService";
-import type { Board } from "@/types";
+import type { BoardUpdate } from "@/types";
 
 const boardService = new BoardService();
 
@@ -36,7 +36,7 @@ export function useBoardDetails(boardId: string) {
   });
 
   const updateBoardMutation = useMutation({
-    mutationFn: (updates: Partial<Board>) =>
+    mutationFn: (updates: Partial<BoardUpdate>) =>
       boardService.updateBoard(boardId, updates),
   });
 

@@ -29,34 +29,28 @@ export class OrganizationService {
   }
 
   async createOrganization(name: string, userId: string) {
-    // Start a Supabase transaction
     const { data: org, error: orgError } = await this.supabase
       .rpc("begin_transaction")
       .then(async () => {
         try {
-          // Check if user already has an organization
           const userOrgs = await this.orgRepo.findUserOrganizations(userId);
           const isFirstOrg = userOrgs.length === 0;
 
-          // Create the organization
           const organization = await this.orgRepo.create({
             name,
             created_by: userId,
           });
 
-          // Add the creator as an owner
           await this.orgMemberRepo.create({
             organization_id: organization.id,
             user_id: userId,
             role: "owner",
           });
 
-          // If this is their first organization, set it as active
           if (isFirstOrg) {
             await this.setActiveOrganization(organization.id);
           }
 
-          // Create a default team
           const team = await this.teamRepo.create({
             organization_id: organization.id,
             name: "Default Team",
@@ -64,7 +58,6 @@ export class OrganizationService {
             created_by: userId,
           });
 
-          // Add creator as team owner
           await this.teamMemberRepo.create({
             team_id: team.id,
             user_id: userId,
@@ -90,7 +83,6 @@ export class OrganizationService {
     userId: string,
     isOrgWide = false
   ) {
-    // Create team
     const team = await this.teamRepo.create({
       organization_id: organizationId,
       name,
@@ -98,7 +90,6 @@ export class OrganizationService {
       created_by: userId,
     });
 
-    // Add creator as team owner
     await this.teamMemberRepo.create({
       team_id: team.id,
       user_id: userId,
@@ -114,7 +105,6 @@ export class OrganizationService {
     role: "admin" | "member" = "member",
     userId: string
   ) {
-    // Check if invite already exists
     const existingInvites = await this.inviteRepo.findPendingInvites(email);
     const hasExistingInvite = existingInvites.some(
       (invite) => invite.organization_id === organizationId

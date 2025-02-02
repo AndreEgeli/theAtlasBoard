@@ -1,17 +1,10 @@
-import React, { useState } from "react";
+import { useState } from "react";
 import { useTasks } from "@/api/hooks/useTasks";
-import { useTodos } from "@/api/hooks/useTodos";
-import type {
-  Task,
-  TodoItem,
-  User as UserType,
-  Tag as TagType,
-} from "../../types";
+import type { Task, Tag as TagType } from "../../types";
 import { Check, Plus, Tag, X } from "lucide-react";
 import { Trash2 } from "lucide-react";
-import { User } from "lucide-react";
-import { useTaskTags } from "@/api/hooks/useTaskTags";
 import { getStatusButton } from "@/utils/taskStatus";
+import { useAuth } from "@/contexts/AuthContext";
 
 interface TaskModalProps {
   boardId: string;
@@ -21,12 +14,22 @@ interface TaskModalProps {
 }
 
 export function TaskModal({ boardId, taskId, tags, onClose }: TaskModalProps) {
-  const { tasks, updateTask, deleteTask, isUpdating, isDeleting } =
-    useTasks(boardId);
+  const { user } = useAuth();
+  const {
+    tasks,
+    updateTask,
+    deleteTask,
+    isUpdating,
+    isDeleting,
+    createTodo,
+    updateTodo,
+    deleteTodo,
+    addTag,
+    removeTag,
+  } = useTasks(boardId);
   const task = tasks.find((t) => t.id === taskId);
+  const todos = task?.task_todos || [];
 
-  const { todos, createTodo, updateTodo, deleteTodo } = useTodos(taskId);
-  const { addTag, removeTag } = useTaskTags(taskId);
   const [title, setTitle] = useState(task?.title || "");
   const [description, setDescription] = useState(task?.description || "");
   const [newTodo, setNewTodo] = useState("");
@@ -35,21 +38,22 @@ export function TaskModal({ boardId, taskId, tags, onClose }: TaskModalProps) {
     return null;
   }
 
-  const taskTags = task?.tags || [];
+  const taskTags = task?.task_tags || [];
 
   const handleAddTodo = async () => {
     if (newTodo.trim()) {
       await createTodo({
-        text: newTodo.trim(),
-        completed: false,
+        title: newTodo.trim(),
+        is_completed: false,
         task_id: task.id,
+        created_by: user?.id,
       });
       setNewTodo("");
     }
   };
 
   const handleToggleTodo = async (todoId: string, completed: boolean) => {
-    await updateTodo({ id: todoId, completed: !completed });
+    await updateTodo({ id: todoId, updates: { is_completed: !completed } });
   };
 
   const handleSave = () => {
@@ -88,7 +92,7 @@ export function TaskModal({ boardId, taskId, tags, onClose }: TaskModalProps) {
     });
   };
 
-  const completedTodos = todos.filter((todo) => todo.completed).length;
+  const completedTodos = todos.filter((todo) => todo.is_completed).length;
   const totalTodos = todos.length;
   const progress = totalTodos === 0 ? 0 : (completedTodos / totalTodos) * 100;
 

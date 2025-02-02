@@ -1,6 +1,6 @@
 import { TagRepository } from "../repositories/TagRepository";
 import { supabase } from "@/lib/supabase";
-import type { Tag } from "@/types";
+import type { Tag, TagInsert } from "@/types";
 
 export class TagService {
   private tagRepo: TagRepository;
@@ -9,11 +9,11 @@ export class TagService {
     this.tagRepo = new TagRepository(supabase);
   }
 
-  async getTags(organizationId: string) {
+  async getTags(organizationId: string): Promise<Tag[]> {
     return this.tagRepo.findByOrganization(organizationId);
   }
 
-  async createTag(tag: Omit<Tag, "id">) {
+  async createTag(tag: Omit<TagInsert, "id">) {
     const userId = (await supabase.auth.getUser()).data.user?.id!;
     return this.tagRepo.create({
       ...tag,
@@ -23,13 +23,5 @@ export class TagService {
 
   async deleteTag(id: string) {
     await this.tagRepo.delete(id);
-  }
-
-  async addTagToTask(taskId: string, tagId: string) {
-    await this.tagRepo.addToTask(taskId, tagId);
-  }
-
-  async removeTagFromTask(taskId: string, tagId: string) {
-    await this.tagRepo.removeFromTask(taskId, tagId);
   }
 }
