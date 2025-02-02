@@ -1,7 +1,7 @@
 import React, { useState } from "react";
 import { Tag } from "lucide-react";
-import { useTags } from "../../hooks/useTags";
-import type { Tag as TagType } from "../../types";
+import { useTags } from "@/api/hooks/useTags";
+import type { Tag as TagType } from "@/types";
 
 const colorOptions = {
   "Light Blue": "#D1E2FF",

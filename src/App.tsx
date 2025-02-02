@@ -14,7 +14,7 @@ import LoginPage from "./pages/LoginPage";
 import { useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 
-const queryClient = new QueryClient({
+export const queryClient = new QueryClient({
   defaultOptions: {
     queries: {
       staleTime: 1000 * 60 * 5, // 5 minutes

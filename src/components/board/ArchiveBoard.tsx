@@ -1,18 +1,16 @@
-import { useTasks } from "../../hooks/useTasks";
-import { User, Tag } from "../../types";
+import { useTasks } from "@/api/hooks/useTasks";
+import { Tag } from "@/types";
 import { TaskCard } from "./TaskCard";
 import { Trash2, Archive } from "lucide-react";
 
 interface ArchiveBoardProps {
   boardId: string;
-  users: User[];
   tags: Tag[];
   onTaskClick: (taskId: string) => void;
 }
 
 export function ArchiveBoard({
   boardId,
-  users,
   tags,
   onTaskClick,
 }: ArchiveBoardProps) {
@@ -56,7 +54,6 @@ export function ArchiveBoard({
           <TaskCard
             key={task.id}
             taskId={task.id}
-            users={users}
             tags={tags}
             boardId={boardId}
             onClick={() => onTaskClick(task.id)}

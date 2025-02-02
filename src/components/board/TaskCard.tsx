@@ -1,29 +1,16 @@
 import React from "react";
-import {
-  Task,
-  User as UserType,
-  Tag as TagType,
-  TodoItem,
-  Tag,
-} from "../../types";
-import { useTasks } from "../../hooks/useTasks";
-import { getStatusButton } from "../../utils/taskStatus";
+import { Task, User as UserType, Tag as TagType, TodoItem, Tag } from "@/types";
+import { useTasks } from "@/api/hooks/useTasks";
+import { getStatusButton } from "@/utils/taskStatus";
 
 interface TaskCardProps {
   taskId: string;
-  users: UserType[];
   tags: TagType[];
   boardId: string;
   onClick: () => void;
 }
 
-export function TaskCard({
-  taskId,
-  users,
-  tags,
-  boardId,
-  onClick,
-}: TaskCardProps) {
+export function TaskCard({ taskId, tags, boardId, onClick }: TaskCardProps) {
   const { tasks, updateTask } = useTasks(boardId);
   const task = tasks.find((t) => t.id === taskId);
 
@@ -58,7 +45,7 @@ export function TaskCard({
     completed: "bg-green-50 border-green-200",
   };
 
-  const assignedUser = users.find((user) => user.name === task.assignee);
+  const assignedUser = task.assignee_id;
 
   return (
     <div

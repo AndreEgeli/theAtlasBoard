@@ -1,6 +1,6 @@
 import React, { useState } from "react";
-import { useTasks } from "../../hooks/useTasks";
-import { useTodos } from "../../hooks/useTodos";
+import { useTasks } from "@/api/hooks/useTasks";
+import { useTodos } from "@/api/hooks/useTodos";
 import type {
   Task,
   TodoItem,
@@ -10,30 +10,22 @@ import type {
 import { Check, Plus, Tag, X } from "lucide-react";
 import { Trash2 } from "lucide-react";
 import { User } from "lucide-react";
-import { createTodo, updateTodo } from "../../api/todos";
-import { useTaskTags } from "../../hooks/useTaskTags";
-import { getStatusButton } from "../../utils/taskStatus";
+import { useTaskTags } from "@/api/hooks/useTaskTags";
+import { getStatusButton } from "@/utils/taskStatus";
 
 interface TaskModalProps {
   boardId: string;
   taskId: string;
-  users: UserType[];
   tags: TagType[];
   onClose: () => void;
 }
 
-export function TaskModal({
-  boardId,
-  taskId,
-  users,
-  tags,
-  onClose,
-}: TaskModalProps) {
+export function TaskModal({ boardId, taskId, tags, onClose }: TaskModalProps) {
   const { tasks, updateTask, deleteTask, isUpdating, isDeleting } =
     useTasks(boardId);
   const task = tasks.find((t) => t.id === taskId);
 
-  const { addTodo, toggleTodo } = useTodos(taskId);
+  const { todos, createTodo, updateTodo, deleteTodo } = useTodos(taskId);
   const { addTag, removeTag } = useTaskTags(taskId);
   const [title, setTitle] = useState(task?.title || "");
   const [description, setDescription] = useState(task?.description || "");
@@ -44,11 +36,10 @@ export function TaskModal({
   }
 
   const taskTags = task?.tags || [];
-  const todos = task?.todos || [];
 
   const handleAddTodo = async () => {
     if (newTodo.trim()) {
-      await addTodo({
+      await createTodo({
         text: newTodo.trim(),
         completed: false,
         task_id: task.id,
@@ -58,7 +49,7 @@ export function TaskModal({
   };
 
   const handleToggleTodo = async (todoId: string, completed: boolean) => {
-    await toggleTodo({ id: todoId, completed: !completed });
+    await updateTodo({ id: todoId, completed: !completed });
   };
 
   const handleSave = () => {
@@ -101,8 +92,6 @@ export function TaskModal({
   const totalTodos = todos.length;
   const progress = totalTodos === 0 ? 0 : (completedTodos / totalTodos) * 100;
 
-  const assignedUser = users.find((user) => user.name === task.assignee);
-
   return (
     <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
       <div className="bg-white rounded-lg w-full max-w-2xl mx-4 p-6">
@@ -131,35 +120,6 @@ export function TaskModal({
         </div>
 
         <div className="flex items-center gap-4 mb-6">
-          <div className="flex-1">
-            <label className="block text-sm font-medium text-gray-700 mb-1">
-              Assign to
-            </label>
-            <div className="flex items-center gap-2">
-              {assignedUser?.avatar ? (
-                <img
-                  src={assignedUser.avatar}
-                  alt={assignedUser.name}
-                  className="w-6 h-6 rounded-full object-cover"
-                />
-              ) : (
-                <User size={20} className="text-gray-400" />
-              )}
-              <select
-                value={task.assignee || ""}
-                onChange={(e) => handleAssigneeChange(e.target.value)}
-                className="flex-1 px-2 py-1 border rounded"
-              >
-                <option value="">Unassigned</option>
-                {users.map((user) => (
-                  <option key={user.id} value={user.name}>
-                    {user.name}
-                  </option>
-                ))}
-              </select>
-            </div>
-          </div>
-
           <div className="flex-1">
             <label className="block text-sm font-medium text-gray-700 mb-1">
               Add tag

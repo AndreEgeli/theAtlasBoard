@@ -203,6 +203,17 @@ BEGIN
 END;
 $$ LANGUAGE plpgsql SECURITY DEFINER;
 
+-- Add helper function to check organization membership (bypasses RLS)
+CREATE OR REPLACE FUNCTION is_organization_member(user_id UUID, org_id UUID)
+RETURNS BOOLEAN AS $$
+BEGIN
+  RETURN EXISTS (
+    SELECT 1 FROM organization_members
+    WHERE organization_id = org_id
+    AND user_id = user_id
+  );
+END;
+$$ LANGUAGE plpgsql SECURITY DEFINER;
 
 -- ============= RLS POLICIES =============
 -- Organizations
@@ -219,11 +230,7 @@ CREATE POLICY "Users can create their first organization"
 CREATE POLICY "Organization members can view their organizations"
   ON organizations FOR SELECT
   USING (
-    EXISTS (
-      SELECT 1 FROM organization_members
-      WHERE organization_id = organizations.id
-      AND user_id = auth.uid()
-    )
+    is_organization_member(auth.uid(), id)
   );
 
 CREATE POLICY "Organization owners can manage organization" ON organizations
@@ -231,16 +238,17 @@ CREATE POLICY "Organization owners can manage organization" ON organizations
     created_by = auth.uid()
   );
 
+CREATE POLICY "Members can view other members in their organizations" 
+  ON organization_members FOR SELECT
+  USING (
+    is_organization_member(auth.uid(), organization_id)
+  );
 
-CREATE POLICY "Organization owners and admins can manage members" ON organization_members
-  FOR ALL USING (
-    EXISTS (
-      SELECT 1 
-      FROM organization_members om
-      WHERE om.organization_id = organization_members.organization_id 
-      AND om.user_id = auth.uid()
-      AND om.role IN ('owner', 'admin')
-    )
+CREATE POLICY "Organization admins and owners can manage members"
+  ON organization_members
+  FOR ALL
+  USING (
+    is_org_admin_or_owner(organization_id)
   );
 
 -- Teams
@@ -402,340 +410,39 @@ CREATE POLICY "Assigned users can update their todos" ON todos
   );
 
 
--- Helper function to create organization with default setup
-CREATE OR REPLACE FUNCTION create_organization(org_name TEXT)
-RETURNS UUID
-LANGUAGE plpgsql
-SECURITY DEFINER
-AS $$
-DECLARE
-  org_id UUID;
-  team_id UUID;
-  user_has_org BOOLEAN;
+-- Create a schema for transaction management if it doesn't exist
+CREATE SCHEMA IF NOT EXISTS tx_management;
+
+-- Function to start a transaction
+CREATE OR REPLACE FUNCTION tx_management.begin_transaction()
+RETURNS void AS
+$$
 BEGIN
-  -- Check if user already has an organization
-  SELECT EXISTS (
-    SELECT 1 FROM organization_members 
-    WHERE user_id = auth.uid()
-  ) INTO user_has_org;
-
-  -- Create the organization
-  INSERT INTO organizations (name, created_by)
-  VALUES (org_name, auth.uid())
-  RETURNING id INTO org_id;
-
-  -- Add the creator as an owner
-  INSERT INTO organization_members (organization_id, user_id, role)
-  VALUES (org_id, auth.uid(), 'owner');
-
-  -- If this is their first organization, set it as active
-  IF NOT user_has_org THEN
-    UPDATE auth.users 
-    SET raw_app_meta_data = raw_app_meta_data || 
-      jsonb_build_object('active_organization_id', org_id)
-    WHERE id = auth.uid();
-  END IF;
-
-  -- Create a default team for the organization
-  INSERT INTO teams (organization_id, name, is_org_wide, created_by)
-  VALUES (org_id, 'Default Team', TRUE, auth.uid())
-  RETURNING id INTO team_id;
-
-  -- Add creator as team owner
-  INSERT INTO team_members (team_id, user_id, role)
-  VALUES (team_id, auth.uid(), 'owner');
-
-  RETURN org_id;
+    -- We don't actually need to do anything here since
+    -- transactions are automatically started when needed
+    RETURN;
 END;
-$$;
+$$ LANGUAGE plpgsql;
 
--- Helper function to create a team
-CREATE OR REPLACE FUNCTION create_team(
-  org_id UUID,
-  team_name TEXT,
-  is_org_wide BOOLEAN DEFAULT FALSE
-) RETURNS UUID AS $$
-DECLARE
-  new_team_id UUID;
+-- Function to commit a transaction
+CREATE OR REPLACE FUNCTION tx_management.commit_transaction()
+RETURNS void AS
+$$
 BEGIN
-  -- Check if user has permission to create team
-  IF NOT EXISTS (
-    SELECT 1 FROM organization_members
-    WHERE organization_id = org_id
-    AND user_id = auth.uid()
-    AND role IN ('admin', 'owner')
-  ) THEN
-    RAISE EXCEPTION 'Insufficient permissions to create team';
-  END IF;
-
-  -- Create team
-  INSERT INTO teams (
-    organization_id,
-    name,
-    is_org_wide,
-    created_by
-  ) VALUES (
-    org_id,
-    team_name,
-    is_org_wide,
-    auth.uid()
-  ) RETURNING id INTO new_team_id;
-
-  -- Add creator as team owner
-  INSERT INTO team_members (team_id, user_id, role)
-  VALUES (new_team_id, auth.uid(), 'owner');
-
-  RETURN new_team_id;
+    -- We don't actually need to do anything here since
+    -- the transaction will be committed automatically
+    RETURN;
 END;
-$$ LANGUAGE plpgsql SECURITY DEFINER;
+$$ LANGUAGE plpgsql;
 
--- Helper function to add member to team
-CREATE OR REPLACE FUNCTION add_team_member(
-  p_team_id UUID,
-  p_user_id UUID,
-  p_member_role team_role DEFAULT 'editor'
-) RETURNS void AS $$
+-- Function to rollback a transaction
+CREATE OR REPLACE FUNCTION tx_management.rollback_transaction()
+RETURNS void AS
+$$
 BEGIN
-  -- Check if user has permission to add members
-  IF NOT EXISTS (
-    SELECT 1 FROM team_members 
-    WHERE team_id = p_team_id 
-    AND user_id = auth.uid() 
-    AND role = 'owner'
-  ) THEN
-    RAISE EXCEPTION 'Only team owners can add members';
-  END IF;
-
-  -- Add member
-  INSERT INTO team_members (
-    team_id,
-    user_id,
-    role
-  ) VALUES (
-    p_team_id,
-    p_user_id,
-    p_member_role
-  )
-  ON CONFLICT (team_id, user_id) 
-  DO UPDATE SET role = p_member_role;
+    RAISE EXCEPTION 'Transaction rolled back';
 END;
-$$ LANGUAGE plpgsql SECURITY DEFINER;
-
--- Helper function to create organization invite
-CREATE OR REPLACE FUNCTION create_organization_invite(
-  org_id UUID,
-  email_address TEXT,
-  member_role org_role DEFAULT 'member'
-) RETURNS UUID AS $$
-DECLARE
-  invite_id UUID;
-BEGIN
-  -- Check if inviter has permission
-  IF NOT is_org_admin_or_owner(org_id) THEN
-    RAISE EXCEPTION 'Insufficient permissions to create invite';
-  END IF;
-
-  -- Check if user is already a member of the organization
-  IF EXISTS (
-    SELECT 1 FROM organization_members WHERE organization_id = org_id AND user_id = auth.uid()
-  ) THEN
-    RAISE EXCEPTION 'User is already a member of the organization';
-  END IF;
-
-  -- Check if user is already invited
-  IF EXISTS (
-    SELECT 1 FROM organization_invites WHERE organization_id = org_id AND email = email_address
-  ) THEN
-    RAISE EXCEPTION 'User is already invited to the organization';
-  END IF;
-
-  -- Create invite
-  INSERT INTO organization_invites (
-    organization_id,
-    email,
-    role,
-    token,
-    created_by
-  ) VALUES (
-    org_id,
-    email_address,
-    member_role,
-    encode(gen_random_bytes(32), 'hex'),
-    auth.uid()
-  ) RETURNING id INTO invite_id;
-
-  RETURN invite_id;
-END;
-$$ LANGUAGE plpgsql SECURITY DEFINER;
-
--- Helper function to accept organization invite
-CREATE OR REPLACE FUNCTION accept_organization_invite(invite_token TEXT)
-RETURNS UUID AS $$
-DECLARE
-  org_id UUID;
-BEGIN
-  -- Get and validate invite
-  UPDATE organization_invites
-  SET 
-    accepted_at = NOW(),
-    accepted_by = auth.uid()
-  WHERE 
-    token = invite_token
-    AND accepted_at IS NULL
-    AND expires_at > NOW()
-  RETURNING organization_id INTO org_id;
-
-  IF org_id IS NULL THEN
-    RAISE EXCEPTION 'Invalid or expired invite';
-  END IF;
-
-  -- Check if user is already a member of the organization
-  IF EXISTS (
-    SELECT 1 FROM organization_members WHERE organization_id = org_id AND user_id = auth.uid()
-  ) THEN
-    RAISE EXCEPTION 'User is already a member of the organization';
-  END IF;
-
-  -- check if email matches the invite
-  IF NOT EXISTS (
-    SELECT 1 FROM organization_invites WHERE email = auth.email() AND token = invite_token
-  ) THEN
-    RAISE EXCEPTION 'Email does not match the invite';
-  END IF;
-
-  -- Add user to organization
-  INSERT INTO organization_members (
-    organization_id,
-    user_id,
-    role
-  )
-  SELECT 
-    organization_id,
-    auth.uid(),
-    role
-  FROM organization_invites
-  WHERE token = invite_token;
-
-  -- Update user's active organization
-  UPDATE auth.users
-  SET raw_app_meta_data = raw_app_meta_data || jsonb_build_object('active_organization_id', org_id)
-  WHERE id = auth.uid();
-
-  -- Return the organization ID
-  RETURN org_id;
-END;
-$$ LANGUAGE plpgsql SECURITY DEFINER;
-
-
-CREATE OR REPLACE FUNCTION get_pending_invites(email_address TEXT)
-RETURNS TABLE (
-    id UUID,
-    organization_id UUID,
-    email TEXT,
-    role org_role,
-    token TEXT,
-    expires_at TIMESTAMPTZ,
-    created_at TIMESTAMPTZ,
-    created_by UUID,
-    accepted_at TIMESTAMPTZ,
-    accepted_by UUID,
-    organization_name TEXT
-) 
-LANGUAGE plpgsql
-SECURITY DEFINER
-AS $$
-BEGIN
-    RETURN QUERY
-    SELECT 
-        oi.id,
-        oi.organization_id,
-        oi.email,
-        oi.role,
-        oi.token,
-        oi.expires_at,
-        oi.created_at,
-        oi.created_by,
-        oi.accepted_at,
-        oi.accepted_by,
-        o.name as organization_name
-    FROM organization_invites oi
-    JOIN organizations o ON o.id = oi.organization_id
-    WHERE 
-        oi.email = email_address
-        AND oi.accepted_at IS NULL
-        AND oi.expires_at > NOW();
-END;
-$$;
-
--- Helper function to get user's accessible boards
-CREATE OR REPLACE FUNCTION get_user_boards(
-  user_id UUID,
-  page_size INTEGER DEFAULT 10,
-  page_number INTEGER DEFAULT 1
-)
-RETURNS TABLE (
-  boards boards,
-  total_count BIGINT
-) AS $$
-DECLARE
-  offset_val INTEGER;
-BEGIN
-  offset_val := (page_number - 1) * page_size;
-
-  RETURN QUERY
-  WITH filtered_boards AS (
-    SELECT b.* FROM boards b
-    WHERE 
-      (NOT b.is_private AND b.team_id IN (
-        SELECT team_id FROM team_members WHERE user_id = user_id
-      ))
-      OR 
-      (b.is_private AND b.created_by = user_id)
-  )
-  SELECT 
-    b.*,
-    (SELECT COUNT(*) FROM filtered_boards)::BIGINT
-  FROM filtered_boards b
-  ORDER BY b.created_at DESC
-  LIMIT page_size
-  OFFSET offset_val;
-END;
-$$ LANGUAGE plpgsql SECURITY DEFINER;
-
--- Helper function to get user's assigned tasks
-CREATE OR REPLACE FUNCTION get_user_tasks(
-  user_id UUID,
-  task_status_filter task_status DEFAULT NULL
-)
-RETURNS TABLE (
-  task_id UUID,
-  title TEXT,
-  board_name TEXT,
-  team_name TEXT,
-  organization_name TEXT,
-  deadline_at TIMESTAMPTZ,
-  status task_status
-) AS $$
-BEGIN
-  RETURN QUERY
-  SELECT 
-    t.id,
-    t.title,
-    b.name as board_name,
-    tm.name as team_name,
-    o.name as organization_name,
-    t.deadline_at,
-    t.status
-  FROM tasks t
-  JOIN task_assignees ta ON t.id = ta.task_id
-  JOIN boards b ON t.board_id = b.id
-  JOIN teams tm ON b.team_id = tm.id
-  JOIN organizations o ON tm.organization_id = o.id
-  WHERE 
-    ta.user_id = user_id
-    AND (task_status_filter IS NULL OR t.status = task_status_filter);
-END;
-$$ LANGUAGE plpgsql SECURITY DEFINER;
+$$ LANGUAGE plpgsql;
 
 
 -- Cleanup expired invites (can be called periodically)

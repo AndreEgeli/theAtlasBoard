@@ -10,7 +10,6 @@ interface FilterSection {
 }
 
 interface FilterPopoverProps {
-  users: User[];
   tags: Tag[];
   filters: {
     assignees: string[];
@@ -29,7 +28,6 @@ interface FilterPopoverProps {
 }
 
 export function FilterPopover({
-  users,
   tags,
   filters,
   onFilterChange,
@@ -37,7 +35,6 @@ export function FilterPopover({
   onClearFilters,
 }: FilterPopoverProps) {
   const [searchState, setSearchState] = useState<Record<string, string>>({
-    users: "",
     status: "",
     tags: "",
   });
@@ -45,10 +42,6 @@ export function FilterPopover({
   const handleSearch = (section: string, value: string) => {
     setSearchState((prev) => ({ ...prev, [section]: value }));
   };
-
-  const filteredUsers = users.filter((user) =>
-    user.name.toLowerCase().includes(searchState.users.toLowerCase())
-  );
 
   const filteredStatuses = Object.entries(TASK_STATUSES).filter(([status]) =>
     status.toLowerCase().includes(searchState.status.toLowerCase())
@@ -148,40 +141,6 @@ export function FilterPopover({
             </div>
 
             <div className="flex gap-4">
-              <FilterSection
-                title="Team Members"
-                searchPlaceholder="Search members..."
-                searchKey="users"
-              >
-                {filteredUsers.map((user) => (
-                  <label
-                    key={user.id}
-                    className="flex items-center gap-2 p-2 rounded hover:bg-gray-50 cursor-pointer"
-                  >
-                    <input
-                      type="checkbox"
-                      checked={filters.assignees.includes(user.name)}
-                      onChange={() => handleToggleAssignee(user.name)}
-                      className="rounded text-blue-500"
-                    />
-                    <div className="flex items-center gap-2">
-                      {user.avatar ? (
-                        <img
-                          src={user.avatar}
-                          alt={user.name}
-                          className="w-6 h-6 rounded-full"
-                        />
-                      ) : (
-                        <div className="w-6 h-6 rounded-full bg-gray-200 flex items-center justify-center text-sm font-medium">
-                          {user.name[0]}
-                        </div>
-                      )}
-                      <span className="text-sm">{user.name}</span>
-                    </div>
-                  </label>
-                ))}
-              </FilterSection>
-
               <FilterSection
                 title="Status"
                 searchPlaceholder="Search status..."

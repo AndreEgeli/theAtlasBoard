@@ -1,7 +1,9 @@
-import { useQuery, useQueryClient } from "@tanstack/react-query";
-import { addTagToTask, removeTagFromTask } from "../api/tags";
+import { useQueryClient } from "@tanstack/react-query";
+import { TagService } from "../services/TagService";
 import { useOptimistic } from "./useOptimistic";
-import type { Task } from "../types";
+import type { Task } from "@/types";
+
+const tagService = new TagService();
 
 export function useTaskTags(taskId: string) {
   const queryClient = useQueryClient();
@@ -9,7 +11,7 @@ export function useTaskTags(taskId: string) {
 
   const addTagMutation = useOptimistic<Task[], string>({
     queryKey,
-    mutationFn: (tagId: string) => addTagToTask(taskId, tagId),
+    mutationFn: (tagId: string) => tagService.addTagToTask(taskId, tagId),
     updateCache: (oldTasks, tagId) =>
       oldTasks.map((task) =>
         task.id === taskId ? { ...task, tags: [...task.tags, tagId] } : task
@@ -18,7 +20,7 @@ export function useTaskTags(taskId: string) {
 
   const removeTagMutation = useOptimistic<Task[], string>({
     queryKey,
-    mutationFn: (tagId: string) => removeTagFromTask(taskId, tagId),
+    mutationFn: (tagId: string) => tagService.removeTagFromTask(taskId, tagId),
     updateCache: (oldTasks, tagId) =>
       oldTasks.map((task) =>
         task.id === taskId

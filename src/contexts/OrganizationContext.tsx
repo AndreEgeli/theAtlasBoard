@@ -1,16 +1,25 @@
-import { createContext, useContext, useState, useEffect } from "react";
+import { createContext, useContext } from "react";
 import { useNavigate } from "react-router-dom";
 import { Organization, Team, OrganizationMember } from "../types";
-import { organizationApi } from "../api/organizations";
 import { useAuth } from "./AuthContext";
-import { supabase } from "../lib/supabase";
+import { useOrganization as useOrganizationHook } from "@/api/hooks/useOrganization";
+import { OrganizationWithMembers } from "@/api/repositories/OrganizationRepository";
 
 interface OrganizationContextType {
   currentOrganization: Organization | null;
+  organizations: OrganizationWithMembers[];
   teams: Team[];
   members: OrganizationMember[];
-  setCurrentOrganization: (org: Organization) => void;
   isLoading: boolean;
+  error: Error | null;
+  createOrganization: (name: string) => void;
+  createTeam: (params: { name: string; isOrgWide?: boolean }) => void;
+  inviteMember: (params: { email: string; role?: "admin" | "member" }) => void;
+  switchOrganization: (organizationId: string) => void;
+  isCreating: boolean;
+  isCreatingTeam: boolean;
+  isInviting: boolean;
+  isSwitchingOrg: boolean;
 }
 
 const OrganizationContext = createContext<OrganizationContextType | undefined>(
@@ -23,62 +32,30 @@ export const OrganizationProvider = ({
   children: React.ReactNode;
 }) => {
   const { user } = useAuth();
-
-  console.log("user", user);
-
   const navigate = useNavigate();
-  const [currentOrganization, setCurrentOrganization] =
-    useState<Organization | null>(null);
-  const [teams, setTeams] = useState<Team[]>([]);
-  const [members, setMembers] = useState<OrganizationMember[]>([]);
-  const [isLoading, setIsLoading] = useState(true);
 
-  useEffect(() => {
-    const loadOrganization = async () => {
-      if (!user) {
-        setIsLoading(false);
-        return;
-      }
+  const {
+    currentOrganization,
+    organizations,
+    teams,
+    members,
+    createOrganization,
+    createTeam,
+    inviteMember,
+    switchOrganization,
+    isLoading,
+    error,
+    isCreating,
+    isCreatingTeam,
+    isInviting,
+    isSwitchingOrg,
+  } = useOrganizationHook();
 
-      try {
-        // Get current organization
-        const { data: org, error: orgError } = await supabase
-          .from("organizations")
-          .select(
-            `
-            *,
-            organization_members!inner (
-              user_id,
-              organization_id,
-              role
-            )
-          `
-          )
-          .eq("organization_members.user_id", user.id)
-          .single();
-
-        if (orgError) throw orgError;
-
-        setCurrentOrganization(org);
-
-        // Load teams and members in parallel
-        const [teamsData, membersData] = await Promise.all([
-          organizationApi.getTeams(org.id),
-          organizationApi.getMembers(org.id),
-        ]);
-
-        setTeams(teamsData);
-        setMembers(membersData);
-      } catch (error) {
-        console.error("Error loading organization:", error);
-        navigate("/post-signup");
-      } finally {
-        setIsLoading(false);
-      }
-    };
-
-    loadOrganization();
-  }, [user, navigate]);
+  // Redirect to post-signup if user has no organizations
+  if (!isLoading && !currentOrganization && user) {
+    navigate("/post-signup");
+    return null;
+  }
 
   if (isLoading) {
     return (
@@ -91,19 +68,23 @@ export const OrganizationProvider = ({
     );
   }
 
-  // If no organization and not loading, the user will be redirected in the useEffect
-  if (!currentOrganization) {
-    return null;
-  }
-
   return (
     <OrganizationContext.Provider
       value={{
-        currentOrganization,
-        teams,
-        members,
-        setCurrentOrganization,
+        currentOrganization: currentOrganization || null,
+        organizations: organizations || [],
+        teams: teams || [],
+        members: members || [],
         isLoading,
+        error,
+        createOrganization,
+        createTeam,
+        inviteMember,
+        switchOrganization,
+        isCreating,
+        isCreatingTeam,
+        isInviting,
+        isSwitchingOrg,
       }}
     >
       {children}

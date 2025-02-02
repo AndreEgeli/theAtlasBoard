@@ -6,10 +6,9 @@ import { ArchiveBoard } from "./ArchiveBoard";
 import { TaskModal } from "./TaskModal";
 import { FilterPopover } from "./FilterPopover";
 import { TagManagement } from "./TagManagement";
-import { useBoardDetails } from "../../hooks/useBoards";
-import { useUsers } from "../../hooks/useUsers";
-import { useTags } from "../../hooks/useTags";
-import { useFiltering } from "../../hooks/useFiltering";
+import { useBoardDetails } from "@/api/hooks/useBoards";
+import { useTags } from "@/api/hooks/useTags";
+import { useFiltering } from "@/api/hooks/useFiltering";
 
 export const BoardWrapper = () => {
   const { boardId } = useParams();
@@ -19,7 +18,6 @@ export const BoardWrapper = () => {
     updateBoard,
     deleteBoard,
   } = useBoardDetails(boardId ?? "");
-  const { users } = useUsers();
   const { tags } = useTags();
   const [selectedTaskId, setSelectedTaskId] = useState<string | null>(null);
   const { filters, setFilters, filterTasks, hasActiveFilters, clearFilters } =
@@ -74,7 +72,6 @@ export const BoardWrapper = () => {
               {!location.pathname.endsWith("/archive") && (
                 <>
                   <FilterPopover
-                    users={users}
                     tags={tags}
                     filters={filters}
                     onFilterChange={setFilters}
@@ -90,14 +87,12 @@ export const BoardWrapper = () => {
         {location.pathname.endsWith("/archive") ? (
           <ArchiveBoard
             boardId={boardId}
-            users={users}
             tags={tags}
             onTaskClick={setSelectedTaskId}
           />
         ) : (
           <Board
             boardId={boardId}
-            users={users}
             tags={tags}
             onTaskClick={setSelectedTaskId}
             onTaskCreated={handleTaskCreated}
@@ -109,7 +104,6 @@ export const BoardWrapper = () => {
       {selectedTaskId && (
         <TaskModal
           taskId={selectedTaskId}
-          users={users}
           tags={tags}
           boardId={boardId}
           onClose={() => setSelectedTaskId(null)}

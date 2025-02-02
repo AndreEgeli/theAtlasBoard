@@ -60,12 +60,12 @@ export interface Board {
 export interface CellPosition {
   x_index: Task["x_index"];
   y_index: Task["y_index"];
+  order: Task["order"];
 }
 
 export interface Organization {
   id: string;
   name: string;
-  slug: string;
   created_at: string;
   created_by: string;
 }
@@ -73,7 +73,6 @@ export interface Organization {
 export interface Team {
   id: string;
   name: string;
-  slug: string;
   organization_id: string;
   is_org_wide: boolean;
   created_at: string;

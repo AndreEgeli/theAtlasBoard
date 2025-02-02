@@ -1,12 +1,8 @@
 import React, { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { useAuth } from "../contexts/AuthContext";
-import {
-  getPendingInvites,
-  acceptInvite,
-  createOrganization,
-} from "../lib/auth";
-import type { PendingInvite } from "../types";
+import { useAuth } from "@/contexts/AuthContext";
+import type { PendingInvite } from "@/types";
+import { useOrganization } from "@/api/hooks/useOrganization";
 
 export function PostSignupFlow() {
   const { user, loading: authLoading } = useAuth();
@@ -16,40 +12,12 @@ export function PostSignupFlow() {
   const [creating, setCreating] = useState(false);
   const [orgName, setOrgName] = useState("");
   const [error, setError] = useState<string | null>(null);
-
-  useEffect(() => {
-    // If auth is still loading, wait
-    if (authLoading) return;
-
-    // If no user after auth loading completes, redirect to login
-    if (!user) {
-      navigate("/login");
-      return;
-    }
-
-    // Only load invites if we have a user email
-    if (user.email) {
-      loadInvites();
-    } else {
-      setLoading(false);
-    }
-  }, [user, authLoading, navigate]);
-
-  const loadInvites = async () => {
-    if (!user?.email) return;
-    try {
-      const pendingInvites = await getPendingInvites(user.email);
-      setInvites(pendingInvites);
-    } catch (error) {
-      console.error("Error loading invites:", error);
-    } finally {
-      setLoading(false);
-    }
-  };
+  const { pendingInvites, acceptInvite, createOrganization } =
+    useOrganization();
 
   const handleAcceptInvite = async (token: string) => {
     try {
-      const { organizationId } = await acceptInvite(token);
+      await acceptInvite(token);
       navigate(`/`);
     } catch (error) {
       console.error("Error accepting invite:", error);
@@ -64,7 +32,7 @@ export function PostSignupFlow() {
     setError(null);
 
     try {
-      const { organizationId } = await createOrganization(orgName.trim());
+      await createOrganization(orgName.trim());
       navigate("/");
     } catch (err) {
       setError(

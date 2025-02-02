@@ -1,23 +1,14 @@
 import React, { useState } from "react";
-import { Task, CellPosition, User, Tag } from "../../types";
+import { Task, CellPosition, User, Tag } from "@/types";
 import { TaskCard } from "./TaskCard";
 import { Plus } from "lucide-react";
-import { useTasks } from "../../hooks/useTasks";
+import { useTasks } from "@/api/hooks/useTasks";
 
-const importanceLevels: Task["importance"][] = [
-  "super critical",
-  "critical",
-  "not critical",
-];
-const timeframeLevels: Task["timeframe"][] = [
-  ">3 hours",
-  "> 1 day",
-  "> 1 week",
-];
+const importanceLevels = ["super critical", "critical", "not critical"];
+const timeframeLevels = [">3 hours", "> 1 day", "> 1 week"];
 
 interface BoardProps {
   boardId: string;
-  users: User[];
   tags: Tag[];
   onTaskClick: (taskId: string) => void;
   onTaskCreated: (taskId: string) => void;
@@ -26,7 +17,6 @@ interface BoardProps {
 
 export function Board({
   boardId,
-  users,
   tags,
   onTaskClick,
   onTaskCreated,
@@ -56,16 +46,16 @@ export function Board({
       moveTask({
         id: sourceTaskId,
         position: {
-          importance: targetTask.importance,
-          timeframe: targetTask.timeframe,
+          x_index: targetTask.x_index,
+          y_index: targetTask.y_index,
           order: targetTask.order,
         },
       });
       moveTask({
         id: targetTaskId,
         position: {
-          importance: sourceTask.importance,
-          timeframe: sourceTask.timeframe,
+          x_index: sourceTask.x_index,
+          y_index: sourceTask.y_index,
           order: sourceTask.order,
         },
       });
@@ -79,13 +69,10 @@ export function Board({
     const newTask = await createTask({
       title: "New Task",
       description: "",
-      importance: position.importance,
-      timeframe: position.timeframe,
-      status: "pending",
-      assignee: "",
-      todos: [],
-      tags: [],
+      x_index: position.x_index,
+      y_index: position.y_index,
       order: tasks.length,
+      status: "pending",
     });
     onTaskCreated(newTask.id);
   };
@@ -132,9 +119,21 @@ export function Board({
               {timeframeLevels.map((timeframe, j) => (
                 <div
                   key={`${importance}-${timeframe}`}
-                  onDrop={(e) => handleDrop(e, { importance, timeframe })}
+                  onDrop={(e) =>
+                    handleDrop(e, {
+                      x_index: i,
+                      y_index: j,
+                      order: tasks.length,
+                    })
+                  }
                   onDragOver={handleDragOver}
-                  onClick={(e) => handleCellClick(e, { importance, timeframe })}
+                  onClick={(e) =>
+                    handleCellClick(e, {
+                      x_index: i,
+                      y_index: j,
+                      order: tasks.length,
+                    })
+                  }
                   className={`
                     min-h-[200px] p-4 relative group/cell
                     ${
@@ -156,11 +155,7 @@ export function Board({
                   </div>
 
                   {tasks
-                    .filter(
-                      (task) =>
-                        task.importance === importance &&
-                        task.timeframe === timeframe
-                    )
+                    .filter((task) => task.x_index === i && task.y_index === j)
                     .filter((task) => filterTasks([task]).length > 0)
                     .sort((a, b) => (a.order || 0) - (b.order || 0))
                     .map((task) => (
@@ -177,7 +172,6 @@ export function Board({
                       >
                         <TaskCard
                           taskId={task.id}
-                          users={users}
                           tags={tags}
                           boardId={boardId}
                           onClick={() => onTaskClick(task.id)}

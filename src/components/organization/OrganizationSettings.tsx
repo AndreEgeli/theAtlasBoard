@@ -5,7 +5,7 @@ import { supabase } from "../../lib/supabase";
 import { useNavigate } from "react-router-dom";
 
 export function OrganizationSettings() {
-  const { currentOrganization, setCurrentOrganization } = useOrganization();
+  const { currentOrganization, switchOrganization } = useOrganization();
   const [name, setName] = useState(currentOrganization?.name ?? "");
   const [isUpdating, setIsUpdating] = useState(false);
   const [isDeleting, setIsDeleting] = useState(false);
@@ -26,7 +26,7 @@ export function OrganizationSettings() {
         .single();
 
       if (error) throw error;
-      setCurrentOrganization(org);
+      switchOrganization(org);
     } catch (error) {
       console.error("Error updating organization:", error);
     } finally {
@@ -45,7 +45,7 @@ export function OrganizationSettings() {
         .eq("id", currentOrganization.id);
 
       if (error) throw error;
-      setCurrentOrganization(null);
+      switchOrganization(null);
       navigate("/");
     } catch (error) {
       console.error("Error deleting organization:", error);
