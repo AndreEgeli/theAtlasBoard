@@ -29,52 +29,48 @@ export class OrganizationService {
   }
 
   async createOrganization(name: string, userId: string) {
-    const { data: org, error: orgError } = await this.supabase
-      .rpc("begin_transaction")
-      .then(async () => {
-        try {
-          const userOrgs = await this.orgRepo.findUserOrganizations(userId);
-          const isFirstOrg = userOrgs.length === 0;
-
-          const organization = await this.orgRepo.create({
-            name,
-            created_by: userId,
-          });
-
-          await this.orgMemberRepo.create({
-            organization_id: organization.id,
-            user_id: userId,
-            role: "owner",
-          });
-
-          if (isFirstOrg) {
-            await this.setActiveOrganization(organization.id);
-          }
-
-          const team = await this.teamRepo.create({
-            organization_id: organization.id,
-            name: "Default Team",
-            is_org_wide: true,
-            created_by: userId,
-          });
-
-          await this.teamMemberRepo.create({
-            team_id: team.id,
-            user_id: userId,
-            role: "owner",
-          });
-
-          await this.supabase.rpc("commit_transaction");
-          return { data: organization, error: null };
-        } catch (error) {
-          await this.supabase.rpc("rollback_transaction");
-          return { data: null, error };
-        }
+    try {
+      // Create the organization
+      const organization = await this.orgRepo.create({
+        name,
+        created_by: userId,
       });
 
-    if (orgError) throw orgError;
-    if (!org) throw new Error("Organization not created successfully");
-    return this.orgRepo.findWithMembers(org.id);
+      // Create organization membership
+      await this.orgMemberRepo.create({
+        organization_id: organization.id,
+        user_id: userId,
+        role: "owner",
+      });
+
+      // Check if this is the user's first organization
+      const userOrgs = await this.orgRepo.findUserOrganizations(userId);
+      if (userOrgs.length === 1) {
+        await this.setActiveOrganization(organization.id);
+      }
+
+      // Create default team
+      const team = await this.teamRepo.create({
+        organization_id: organization.id,
+        name: "Default Team",
+        is_org_wide: true,
+        created_by: userId,
+      });
+
+      // Create team membership
+      await this.teamMemberRepo.create({
+        team_id: team.id,
+        user_id: userId,
+        role: "owner",
+      });
+
+      return this.orgRepo.findWithMembers(organization.id);
+    } catch (error) {
+      console.error("Error creating organization:", error);
+      throw new Error(
+        error instanceof Error ? error.message : "Failed to create organization"
+      );
+    }
   }
 
   async createTeam(
@@ -165,34 +161,39 @@ export class OrganizationService {
   }
 
   async getCurrentOrganization(userId: string) {
-    const hasOrg = await this.userService.checkUserOrganizations(userId);
+    try {
+      const hasOrg = await this.userService.checkUserOrganizations(userId);
 
-    if (!hasOrg) {
-      // TODO: Redirect to create organization page
-
-      throw new Error("User does not have any organizations");
-    }
-
-    const {
-      data: { user },
-      error,
-    } = await supabase.auth.getUser();
-
-    if (error) throw error;
-
-    const activeOrgId = user?.user_metadata?.active_organization_id;
-
-    if (!activeOrgId) {
-      // Get first organization if no active one is set
-      const orgs = await this.orgRepo.findUserOrganizations(userId);
-      if (orgs.length > 0) {
-        await this.setActiveOrganization(orgs[0].id);
-        return orgs[0];
+      if (!hasOrg) {
+        // Instead of throwing an error, return null
+        // This will allow the UI to handle the no-org state
+        return null;
       }
-      return null;
-    }
 
-    return this.orgRepo.findOne(activeOrgId);
+      const {
+        data: { user },
+        error,
+      } = await supabase.auth.getUser();
+
+      if (error) throw error;
+
+      const activeOrgId = user?.user_metadata?.active_organization_id;
+
+      if (!activeOrgId) {
+        // Get first organization if no active one is set
+        const orgs = await this.orgRepo.findUserOrganizations(userId);
+        if (orgs.length > 0) {
+          await this.setActiveOrganization(orgs[0].id);
+          return orgs[0];
+        }
+        return null;
+      }
+
+      return this.orgRepo.findOne(activeOrgId);
+    } catch (error) {
+      console.error("Error getting current organization:", error);
+      return null; // Return null instead of throwing
+    }
   }
 
   async getUserOrganizations(userId: string) {

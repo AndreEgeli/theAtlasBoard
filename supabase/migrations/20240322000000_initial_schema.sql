@@ -12,7 +12,8 @@ DROP TABLE IF EXISTS
   teams,
   organization_members,
   organizations,
-  organization_invites
+  organization_invites,
+  users
 CASCADE;
 
 -- ============= ENUMS =============
@@ -21,18 +22,35 @@ CREATE TYPE team_role AS ENUM ('owner', 'editor', 'viewer');
 CREATE TYPE task_status AS ENUM ('pending', 'started', 'in_review', 'completed', 'archived');
 
 -- ============= TABLES =============
+-- Users (moved to top since other tables reference it)
+CREATE TABLE users (
+  id UUID PRIMARY KEY REFERENCES auth.users(id) ON DELETE CASCADE,
+  email TEXT NOT NULL,
+  active_organization_id UUID,  -- Will be updated with foreign key after organizations table is created
+  name TEXT,
+  avatar_url TEXT,
+  created_at TIMESTAMPTZ DEFAULT NOW(),
+  updated_at TIMESTAMPTZ DEFAULT NOW()
+);
+
 -- Organizations
 CREATE TABLE organizations (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   name TEXT NOT NULL,
   created_at TIMESTAMPTZ DEFAULT NOW(),
-  created_by UUID REFERENCES auth.users(id) NOT NULL
+  created_by UUID REFERENCES users(id) NOT NULL  -- Changed to reference users instead of auth.users
 );
+
+-- Add foreign key for active_organization_id now that organizations exists
+ALTER TABLE users 
+  ADD CONSTRAINT fk_users_active_organization 
+  FOREIGN KEY (active_organization_id) 
+  REFERENCES organizations(id);
 
 -- Organization members
 CREATE TABLE organization_members (
   organization_id UUID REFERENCES organizations(id) ON DELETE CASCADE,
-  user_id UUID REFERENCES auth.users(id) ON DELETE CASCADE,
+  user_id UUID REFERENCES users(id) ON DELETE CASCADE,  -- Changed to reference users
   role org_role NOT NULL DEFAULT 'member',
   created_at TIMESTAMPTZ DEFAULT NOW(),
   PRIMARY KEY (organization_id, user_id)
@@ -134,52 +152,74 @@ CREATE TABLE organization_invites (
   accepted_by UUID REFERENCES auth.users(id)
 );
 
--- ============= AUTH USER MODIFICATIONS =============
--- Add active organization tracking to auth.users
-ALTER TABLE auth.users ADD COLUMN IF NOT EXISTS active_organization_id UUID;
+-- ============= TRIGGERS =============
+-- Update updated_at columns
+CREATE OR REPLACE FUNCTION update_updated_at_column()
+RETURNS TRIGGER AS $$
+BEGIN
+  NEW.updated_at = NOW();
+  RETURN NEW;
+END;
+$$ LANGUAGE plpgsql;
 
--- ============= ENABLE RLS =============
-ALTER TABLE organizations ENABLE ROW LEVEL SECURITY;
-ALTER TABLE organization_members ENABLE ROW LEVEL SECURITY;
-ALTER TABLE teams ENABLE ROW LEVEL SECURITY;
-ALTER TABLE team_members ENABLE ROW LEVEL SECURITY;
-ALTER TABLE boards ENABLE ROW LEVEL SECURITY;
-ALTER TABLE tasks ENABLE ROW LEVEL SECURITY;
-ALTER TABLE task_assignees ENABLE ROW LEVEL SECURITY;
-ALTER TABLE todos ENABLE ROW LEVEL SECURITY;
-ALTER TABLE tags ENABLE ROW LEVEL SECURITY;
-ALTER TABLE task_tags ENABLE ROW LEVEL SECURITY;
-ALTER TABLE organization_invites ENABLE ROW LEVEL SECURITY;
+-- Add updated_at trigger to users table
+CREATE TRIGGER update_users_updated_at
+  BEFORE UPDATE ON users
+  FOR EACH ROW
+  EXECUTE FUNCTION update_updated_at_column();
 
+-- Create trigger for new auth users
+CREATE OR REPLACE FUNCTION public.handle_new_user()
+RETURNS TRIGGER AS $$
+BEGIN
+  INSERT INTO public.users (id, email)
+  VALUES (NEW.id, NEW.email);
+  RETURN NEW;
+END;
+$$ LANGUAGE plpgsql SECURITY DEFINER;
+
+CREATE TRIGGER on_auth_user_created
+  AFTER INSERT ON auth.users
+  FOR EACH ROW EXECUTE PROCEDURE public.handle_new_user();
 
 -- ============= HELPER FUNCTIONS =============
--- Get user's organization role
-CREATE OR REPLACE FUNCTION get_user_org_role(org_id UUID)
-RETURNS org_role AS $$
+-- Check if user exists
+CREATE OR REPLACE FUNCTION check_user_exists(user_id UUID)
+RETURNS BOOLEAN AS $$
 BEGIN
-  RETURN (
-    SELECT role FROM organization_members 
-    WHERE organization_id = org_id 
+  RETURN EXISTS(
+    SELECT 1 FROM public.users WHERE id = user_id
+  );
+END;
+$$ LANGUAGE plpgsql SECURITY DEFINER;
+
+-- Add helper function to check organization membership (bypasses RLS)
+CREATE OR REPLACE FUNCTION is_organization_member(org_id UUID)
+RETURNS BOOLEAN AS $$
+BEGIN
+  RETURN EXISTS (
+    SELECT 1 FROM organization_members
+    WHERE organization_id = org_id
     AND user_id = auth.uid()
   );
 END;
 $$ LANGUAGE plpgsql SECURITY DEFINER;
 
--- Check if user is org admin or owner
+-- Add helper function to check if user is admin or owner
 CREATE OR REPLACE FUNCTION is_org_admin_or_owner(org_id UUID)
 RETURNS BOOLEAN AS $$
 BEGIN
   RETURN EXISTS (
     SELECT 1 FROM organization_members
-    WHERE organization_id = org_id 
-    AND user_id = auth.uid() 
+    WHERE organization_id = org_id
+    AND user_id = auth.uid()
     AND role IN ('admin', 'owner')
   );
 END;
 $$ LANGUAGE plpgsql SECURITY DEFINER;
 
--- Get user's team role
-CREATE OR REPLACE FUNCTION get_user_team_role(team_id UUID)
+-- Get user's role in team
+CREATE OR REPLACE FUNCTION get_team_role(team_id UUID)
 RETURNS team_role AS $$
 BEGIN
   RETURN (
@@ -203,19 +243,31 @@ BEGIN
 END;
 $$ LANGUAGE plpgsql SECURITY DEFINER;
 
--- Add helper function to check organization membership (bypasses RLS)
-CREATE OR REPLACE FUNCTION is_organization_member(user_id UUID, org_id UUID)
-RETURNS BOOLEAN AS $$
-BEGIN
-  RETURN EXISTS (
-    SELECT 1 FROM organization_members
-    WHERE organization_id = org_id
-    AND user_id = user_id
-  );
-END;
-$$ LANGUAGE plpgsql SECURITY DEFINER;
-
 -- ============= RLS POLICIES =============
+-- Enable RLS on all tables
+ALTER TABLE users ENABLE ROW LEVEL SECURITY;
+ALTER TABLE organizations ENABLE ROW LEVEL SECURITY;
+ALTER TABLE organization_members ENABLE ROW LEVEL SECURITY;
+ALTER TABLE teams ENABLE ROW LEVEL SECURITY;
+ALTER TABLE team_members ENABLE ROW LEVEL SECURITY;
+ALTER TABLE boards ENABLE ROW LEVEL SECURITY;
+ALTER TABLE tasks ENABLE ROW LEVEL SECURITY;
+ALTER TABLE task_assignees ENABLE ROW LEVEL SECURITY;
+ALTER TABLE todos ENABLE ROW LEVEL SECURITY;
+ALTER TABLE tags ENABLE ROW LEVEL SECURITY;
+ALTER TABLE task_tags ENABLE ROW LEVEL SECURITY;
+ALTER TABLE organization_invites ENABLE ROW LEVEL SECURITY;
+
+-- Users
+CREATE POLICY "Users can view their own data" ON users
+  FOR SELECT TO authenticated
+  USING (id = auth.uid());
+
+CREATE POLICY "Users can update their own data" ON users
+  FOR UPDATE TO authenticated
+  USING (id = auth.uid())
+  WITH CHECK (id = auth.uid());
+
 -- Organizations
 CREATE POLICY "Users can create their first organization"
   ON organizations FOR INSERT
@@ -230,7 +282,7 @@ CREATE POLICY "Users can create their first organization"
 CREATE POLICY "Organization members can view their organizations"
   ON organizations FOR SELECT
   USING (
-    is_organization_member(auth.uid(), id)
+    is_organization_member(id)
   );
 
 CREATE POLICY "Organization owners can manage organization" ON organizations
@@ -238,10 +290,11 @@ CREATE POLICY "Organization owners can manage organization" ON organizations
     created_by = auth.uid()
   );
 
+-- Organization Members
 CREATE POLICY "Members can view other members in their organizations" 
   ON organization_members FOR SELECT
   USING (
-    is_organization_member(auth.uid(), organization_id)
+    is_organization_member(organization_id)
   );
 
 CREATE POLICY "Organization admins and owners can manage members"
@@ -252,19 +305,17 @@ CREATE POLICY "Organization admins and owners can manage members"
   );
 
 -- Teams
-CREATE POLICY "Members can view their teams" ON teams
+CREATE POLICY "Organization members can view teams" ON teams
   FOR SELECT USING (
-    organization_id IN (
-      SELECT organization_id FROM organization_members WHERE user_id = auth.uid()
-    )
+    is_organization_member(organization_id)
   );
 
-CREATE POLICY "Organization admins can manage teams" ON teams
+CREATE POLICY "Organization admins and owners can manage teams" ON teams
   FOR ALL USING (
     is_org_admin_or_owner(organization_id)
   );
 
--- Team members
+-- Team Members
 CREATE POLICY "Team members can view team members" ON team_members
   FOR SELECT USING (
     team_id IN (
@@ -313,67 +364,7 @@ CREATE POLICY "Team editors and owners can manage tasks" ON tasks
     ) OR created_by = auth.uid()
   );
 
--- Organization invites
-CREATE POLICY "Invited users can view their invites" ON organization_invites
-  FOR SELECT USING (
-    email = auth.email()
-  );
-
--- Allow organization admins to manage invites
-CREATE POLICY "Organization admins can manage invites" ON organization_invites
-  FOR ALL USING (
-    is_org_admin_or_owner(organization_id)
-  );
-
--- Allow invited users to accept their invites (update)
-CREATE POLICY "Invited users can accept their invites" ON organization_invites
-  FOR UPDATE USING (
-    email = auth.email() AND accepted_at IS NULL
-  ) WITH CHECK (
-    email = auth.email() AND accepted_at IS NULL
-  );
-
-
-
--- Update team content policies to respect viewer role
-CREATE POLICY "Only editors and owners can update boards" ON boards
-  FOR UPDATE USING (
-    team_id IN (
-      SELECT team_id FROM team_members 
-      WHERE user_id = auth.uid() 
-      AND role IN ('owner', 'editor')
-    )
-  );
-
-CREATE POLICY "Only editors and owners can update tasks" ON tasks
-  FOR UPDATE USING (
-    board_id IN (
-      SELECT id FROM boards 
-      WHERE team_id IN (
-        SELECT team_id FROM team_members 
-        WHERE user_id = auth.uid() 
-        AND role IN ('owner', 'editor')
-      )
-    )
-  );
-
-CREATE POLICY "Only editors and owners can update todos" ON todos
-  FOR UPDATE USING (
-    task_id IN (
-      SELECT id FROM tasks 
-      WHERE board_id IN (
-        SELECT id FROM boards 
-        WHERE team_id IN (
-          SELECT team_id FROM team_members 
-          WHERE user_id = auth.uid() 
-          AND role IN ('owner', 'editor')
-        )
-      )
-    )
-  );
-
-
--- Users can view task assignments for tasks they can access
+-- Task Assignees
 CREATE POLICY "Users can view task assignments" ON task_assignees
   FOR SELECT USING (
     task_id IN (
@@ -387,7 +378,6 @@ CREATE POLICY "Users can view task assignments" ON task_assignees
     )
   );
 
--- Team editors and owners can manage task assignments
 CREATE POLICY "Team editors and owners can manage task assignments" ON task_assignees
   FOR ALL USING (
     task_id IN (
@@ -397,94 +387,89 @@ CREATE POLICY "Team editors and owners can manage task assignments" ON task_assi
     ) OR assigned_by = auth.uid()
   );
 
-CREATE POLICY "Users can view their own assignments" ON task_assignees
+-- Todos
+CREATE POLICY "Users can view todos in accessible tasks" ON todos
   FOR SELECT USING (
-    user_id = auth.uid()
-  );
-
-CREATE POLICY "Assigned users can update their todos" ON todos
-  FOR UPDATE USING (
     task_id IN (
-      SELECT task_id FROM task_assignees WHERE user_id = auth.uid()
+      SELECT id FROM tasks WHERE board_id IN (
+        SELECT id FROM boards WHERE 
+          (NOT is_private AND team_id IN (
+            SELECT team_id FROM team_members WHERE user_id = auth.uid()
+          ))
+          OR (is_private AND created_by = auth.uid())
+      )
     )
   );
 
+CREATE POLICY "Team editors and owners can manage todos" ON todos
+  FOR ALL USING (
+    task_id IN (
+      SELECT id FROM tasks WHERE board_id IN (
+        SELECT id FROM boards WHERE can_edit_team_content(team_id)
+      )
+    ) OR created_by = auth.uid()
+  );
 
--- Create a schema for transaction management if it doesn't exist
-CREATE SCHEMA IF NOT EXISTS tx_management;
+-- Tags
+CREATE POLICY "Organization members can view tags" ON tags
+  FOR SELECT USING (
+    is_organization_member(organization_id)
+  );
 
--- Function to start a transaction
-CREATE OR REPLACE FUNCTION tx_management.begin_transaction()
-RETURNS void AS
-$$
-BEGIN
-    -- We don't actually need to do anything here since
-    -- transactions are automatically started when needed
-    RETURN;
-END;
-$$ LANGUAGE plpgsql;
+CREATE POLICY "Organization admins and owners can manage tags" ON tags
+  FOR ALL USING (
+    is_org_admin_or_owner(organization_id)
+  );
 
--- Function to commit a transaction
-CREATE OR REPLACE FUNCTION tx_management.commit_transaction()
-RETURNS void AS
-$$
-BEGIN
-    -- We don't actually need to do anything here since
-    -- the transaction will be committed automatically
-    RETURN;
-END;
-$$ LANGUAGE plpgsql;
+-- Task Tags
+CREATE POLICY "Users can view task tags" ON task_tags
+  FOR SELECT USING (
+    task_id IN (
+      SELECT id FROM tasks WHERE board_id IN (
+        SELECT id FROM boards WHERE 
+          (NOT is_private AND team_id IN (
+            SELECT team_id FROM team_members WHERE user_id = auth.uid()
+          ))
+          OR (is_private AND created_by = auth.uid())
+      )
+    )
+  );
 
--- Function to rollback a transaction
-CREATE OR REPLACE FUNCTION tx_management.rollback_transaction()
-RETURNS void AS
-$$
-BEGIN
-    RAISE EXCEPTION 'Transaction rolled back';
-END;
-$$ LANGUAGE plpgsql;
+CREATE POLICY "Team editors and owners can manage task tags" ON task_tags
+  FOR ALL USING (
+    task_id IN (
+      SELECT id FROM tasks WHERE board_id IN (
+        SELECT id FROM boards WHERE can_edit_team_content(team_id)
+      )
+    )
+  );
 
+-- Organization Invites
+CREATE POLICY "Invited users can view their invites" ON organization_invites
+  FOR SELECT USING (
+    email = auth.email()
+  );
 
--- Cleanup expired invites (can be called periodically)
-CREATE OR REPLACE FUNCTION cleanup_expired_invites()
-RETURNS void AS $$
-BEGIN
-  DELETE FROM organization_invites
-  WHERE 
-    expires_at < NOW()
-    AND accepted_at IS NULL;
-END;
-$$ LANGUAGE plpgsql SECURITY DEFINER;
+CREATE POLICY "Organization admins can manage invites" ON organization_invites
+  FOR ALL USING (
+    is_org_admin_or_owner(organization_id)
+  );
 
--- ============= TRIGGERS =============
--- Update updated_at columns
-CREATE OR REPLACE FUNCTION update_updated_at_column()
-RETURNS TRIGGER AS $$
-BEGIN
-  NEW.updated_at = NOW();
-  RETURN NEW;
-END;
-$$ LANGUAGE plpgsql;
-
-CREATE TRIGGER update_boards_updated_at
-  BEFORE UPDATE ON boards
-  FOR EACH ROW
-  EXECUTE FUNCTION update_updated_at_column();
-
-CREATE TRIGGER update_tasks_updated_at
-  BEFORE UPDATE ON tasks
-  FOR EACH ROW
-  EXECUTE FUNCTION update_updated_at_column();
-
-CREATE TRIGGER update_todos_updated_at
-  BEFORE UPDATE ON todos
-  FOR EACH ROW
-  EXECUTE FUNCTION update_updated_at_column();
+CREATE POLICY "Invited users can accept their invites" ON organization_invites
+  FOR UPDATE USING (
+    email = auth.email() AND accepted_at IS NULL
+  ) WITH CHECK (
+    email = auth.email() AND accepted_at IS NULL
+  );
 
 -- ============= INDEXES =============
 -- Organizations
 CREATE INDEX idx_org_members_user ON organization_members(user_id);
 CREATE INDEX idx_org_members_org ON organization_members(organization_id);
+
+-- Add users table indexes
+CREATE INDEX idx_users_email ON users(email);
+CREATE INDEX idx_users_active_org ON users(active_organization_id);
 
 -- Teams
 CREATE INDEX idx_teams_org ON teams(organization_id);

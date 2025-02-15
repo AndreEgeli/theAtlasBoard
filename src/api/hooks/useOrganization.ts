@@ -11,6 +11,8 @@ export function useOrganization() {
   const { user } = useAuth();
   const queryClient = useQueryClient();
 
+  console.log("useOrganization hook called, user:", user?.id);
+
   // Get current organization
   const {
     data: currentOrganization,
@@ -18,8 +20,17 @@ export function useOrganization() {
     error: orgError,
   } = useQuery({
     queryKey: ["currentOrganization"],
-    queryFn: () => organizationService.getCurrentOrganization(user?.id!),
+    queryFn: () => {
+      console.log("Fetching current organization for user:", user?.id);
+      return organizationService.getCurrentOrganization(user?.id!);
+    },
     enabled: !!user?.id,
+  });
+
+  console.log("Current organization query state:", {
+    data: currentOrganization,
+    isLoading: isLoadingOrg,
+    error: orgError,
   });
 
   // Get all user's organizations
@@ -225,6 +236,7 @@ export function useOrganization() {
     }
   }, [currentOrganization, queryClient]);
 
+  // Consider it loading if either query is loading
   const isLoading =
     isLoadingOrg || isLoadingTeams || isLoadingMembers || isLoadingOrgs;
   const error = orgError || teamsError || membersError;

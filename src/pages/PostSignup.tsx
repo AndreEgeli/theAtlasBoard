@@ -1,18 +1,24 @@
-import React, { useEffect, useState } from "react";
+import React, { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { useAuth } from "@/contexts/AuthContext";
-import type { PendingInvite } from "@/types";
 import { useOrganization } from "@/api/hooks/useOrganization";
+import {
+  Card,
+  CardHeader,
+  CardContent,
+  CardFooter,
+} from "@/components/ui/card";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Building2, Users, Loader2 } from "lucide-react";
+import { cn } from "@/lib/utils";
 
 export function PostSignupFlow() {
   const { user, loading: authLoading } = useAuth();
   const navigate = useNavigate();
-  const [invites, setInvites] = useState<PendingInvite[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [creating, setCreating] = useState(false);
   const [orgName, setOrgName] = useState("");
   const [error, setError] = useState<string | null>(null);
-  const { pendingInvites, acceptInvite, createOrganization } =
+  const { pendingInvites, acceptInvite, createOrganization, isCreating } =
     useOrganization();
 
   const handleAcceptInvite = async (token: string) => {
@@ -28,7 +34,6 @@ export function PostSignupFlow() {
     e.preventDefault();
     if (!orgName.trim()) return;
 
-    setCreating(true);
     setError(null);
 
     try {
@@ -39,17 +44,15 @@ export function PostSignupFlow() {
         err instanceof Error ? err.message : "Failed to create organization"
       );
       console.error("Error creating organization:", err);
-    } finally {
-      setCreating(false);
     }
   };
 
   // Show loading state while either auth or invites are loading
-  if (authLoading || loading) {
+  if (authLoading) {
     return (
-      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
+      <div className="min-h-screen bg-gradient-to-b from-gray-50 to-gray-100 flex items-center justify-center">
         <div className="text-center">
-          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-gray-900 mx-auto"></div>
+          <Loader2 className="h-8 w-8 animate-spin mx-auto text-blue-600" />
           <p className="mt-4 text-gray-600">Loading...</p>
         </div>
       </div>
@@ -57,73 +60,155 @@ export function PostSignupFlow() {
   }
 
   return (
-    <div className="min-h-screen bg-gray-50 flex">
-      {/* Create Organization Form */}
-      <div className="flex-1 flex flex-col justify-center py-12 px-4 sm:px-6 lg:px-8">
-        <div className="max-w-md w-full mx-auto">
-          <h2 className="mt-6 text-center text-3xl font-extrabold text-gray-900">
-            Create your organization
-          </h2>
-          {error && (
-            <div className="mt-2 text-center text-sm text-red-600">{error}</div>
+    <div className="min-h-screen bg-gradient-to-b from-gray-50 to-gray-100 flex flex-col items-center px-4 py-16">
+      <div className="max-w-4xl w-full mx-auto space-y-8">
+        {/* Welcome Header */}
+        <div className="text-center space-y-4 mb-12">
+          <h1 className="text-4xl font-bold tracking-tight text-gray-900">
+            Welcome to Atlasboard
+          </h1>
+          <p className="text-lg text-gray-600 max-w-2xl mx-auto">
+            Everything in Atlasboard revolves around your organization and
+            teams. Create your organization to get started, or join an existing
+            one through an invitation.
+          </p>
+        </div>
+
+        <div
+          className={cn("grid gap-8", {
+            "md:grid-cols-2": pendingInvites.length > 0,
+            "max-w-md mx-auto w-full": pendingInvites.length === 0,
+          })}
+        >
+          {/* Create Organization Card */}
+          <Card
+            className={cn("shadow-lg", {
+              "md:col-span-2": pendingInvites.length === 0,
+            })}
+          >
+            <CardHeader>
+              <div className="flex items-center gap-2 mb-2">
+                <Building2 className="h-5 w-5 text-blue-600" />
+                <h2 className="text-2xl font-semibold text-gray-900">
+                  Create Organization
+                </h2>
+              </div>
+              <p className="text-sm text-gray-500">
+                {pendingInvites.length === 0
+                  ? "Get started by creating your organization workspace"
+                  : "Set up your own organization and start inviting team members"}
+              </p>
+            </CardHeader>
+            <CardContent>
+              {error && (
+                <div className="mb-4 p-3 rounded-lg bg-red-50 text-red-600 text-sm">
+                  {error}
+                </div>
+              )}
+              <form onSubmit={handleCreateOrganization}>
+                <div className="space-y-4">
+                  <div className="space-y-2">
+                    <label
+                      htmlFor="orgName"
+                      className="text-sm font-medium text-gray-700"
+                    >
+                      Organization Name
+                    </label>
+                    <Input
+                      id="orgName"
+                      value={orgName}
+                      onChange={(e) => setOrgName(e.target.value)}
+                      placeholder="Enter organization name"
+                      className="w-full"
+                    />
+                  </div>
+                  <Button
+                    type="submit"
+                    disabled={isCreating}
+                    className="w-full"
+                  >
+                    {isCreating && (
+                      <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                    )}
+                    {isCreating ? "Creating..." : "Create Organization"}
+                  </Button>
+                </div>
+              </form>
+            </CardContent>
+          </Card>
+
+          {/* Pending Invites Card */}
+          {pendingInvites.length > 0 && (
+            <Card className="shadow-lg">
+              <CardHeader>
+                <div className="flex items-center gap-2 mb-2">
+                  <Users className="h-5 w-5 text-green-600" />
+                  <h2 className="text-2xl font-semibold text-gray-900">
+                    Join Organization
+                  </h2>
+                </div>
+                <p className="text-sm text-gray-500">
+                  Accept an invitation to join an existing organization
+                </p>
+              </CardHeader>
+              <CardContent>
+                <div className="space-y-4">
+                  {pendingInvites.map((invite) => (
+                    <Card key={invite.id} className="shadow-sm">
+                      <CardContent className="p-4">
+                        <h3 className="text-lg font-medium mb-2">
+                          {invite.organizations?.name}
+                        </h3>
+                        <p className="text-sm text-gray-500 mb-4">
+                          Role: {invite.role}
+                        </p>
+                        <Button
+                          onClick={() => handleAcceptInvite(invite.token)}
+                          variant="secondary"
+                          className="w-full"
+                        >
+                          Accept Invite
+                        </Button>
+                      </CardContent>
+                    </Card>
+                  ))}
+                </div>
+              </CardContent>
+            </Card>
           )}
-          <form className="mt-8 space-y-6" onSubmit={handleCreateOrganization}>
-            <div>
-              <label
-                htmlFor="orgName"
-                className="block text-sm font-medium text-gray-700"
-              >
-                Organization Name
-              </label>
-              <input
-                id="orgName"
-                type="text"
-                required
-                value={orgName}
-                onChange={(e) => setOrgName(e.target.value)}
-                className="mt-1 block w-full border border-gray-300 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-blue-500 focus:border-blue-500"
-              />
-            </div>
-            <button
-              type="submit"
-              disabled={creating}
-              className="w-full flex justify-center py-2 px-4 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 disabled:opacity-50"
-            >
-              {creating ? "Creating..." : "Create Organization"}
-            </button>
-          </form>
+        </div>
+
+        {/* Information Cards */}
+        <div className="grid md:grid-cols-3 gap-6 mt-12">
+          <Card>
+            <CardContent className="pt-6">
+              <h3 className="text-lg font-semibold mb-2">Organizations</h3>
+              <p className="text-sm text-gray-600">
+                Create and manage your company's workspace, invite team members,
+                and set up permissions.
+              </p>
+            </CardContent>
+          </Card>
+          <Card>
+            <CardContent className="pt-6">
+              <h3 className="text-lg font-semibold mb-2">Teams</h3>
+              <p className="text-sm text-gray-600">
+                Organize your members into teams for better collaboration and
+                project management.
+              </p>
+            </CardContent>
+          </Card>
+          <Card>
+            <CardContent className="pt-6">
+              <h3 className="text-lg font-semibold mb-2">Collaboration</h3>
+              <p className="text-sm text-gray-600">
+                Work together seamlessly with your team members on projects and
+                tasks.
+              </p>
+            </CardContent>
+          </Card>
         </div>
       </div>
-
-      {/* Pending Invites */}
-      {invites.length > 0 && (
-        <div className="flex-1 flex flex-col justify-center py-12 px-4 sm:px-6 lg:px-8">
-          <div className="max-w-md w-full mx-auto">
-            <h2 className="mt-6 text-center text-3xl font-extrabold text-gray-900">
-              Or join an organization
-            </h2>
-            <div className="mt-8 space-y-4">
-              {invites.map((invite) => (
-                <div
-                  key={invite.id}
-                  className="border rounded-lg p-4 bg-white shadow-sm"
-                >
-                  <h3 className="text-lg font-medium">
-                    {invite.organization_name}
-                  </h3>
-                  <p className="text-sm text-gray-500">Role: {invite.role}</p>
-                  <button
-                    onClick={() => handleAcceptInvite(invite.token)}
-                    className="mt-2 w-full flex justify-center py-2 px-4 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-green-600 hover:bg-green-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-green-500"
-                  >
-                    Accept Invite
-                  </button>
-                </div>
-              ))}
-            </div>
-          </div>
-        </div>
-      )}
     </div>
   );
 }

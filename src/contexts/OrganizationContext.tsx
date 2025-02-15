@@ -1,9 +1,10 @@
 import { createContext, useContext } from "react";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, useLocation } from "react-router-dom";
 import { Organization, Team, OrganizationMember } from "../types";
 import { useAuth } from "./AuthContext";
 import { useOrganization as useOrganizationHook } from "@/api/hooks/useOrganization";
 import { OrganizationWithMembers } from "@/api/repositories/OrganizationRepository";
+import { useEffect } from "react";
 
 interface OrganizationContextType {
   currentOrganization: Organization | null;
@@ -33,6 +34,7 @@ export const OrganizationProvider = ({
 }) => {
   const { user } = useAuth();
   const navigate = useNavigate();
+  const location = useLocation();
 
   const {
     currentOrganization,
@@ -51,13 +53,19 @@ export const OrganizationProvider = ({
     isSwitchingOrg,
   } = useOrganizationHook();
 
-  // Redirect to post-signup if user has no organizations
-  if (!isLoading && !currentOrganization && user) {
-    navigate("/post-signup");
-    return null;
-  }
+  useEffect(() => {
+    if (
+      !isLoading &&
+      !currentOrganization &&
+      user &&
+      location.pathname !== "/post-signup"
+    ) {
+      console.log("No organization found, redirecting to post-signup");
+      navigate("/post-signup", { replace: true });
+    }
+  }, [isLoading, currentOrganization, user, navigate, location.pathname]);
 
-  if (isLoading) {
+  if (isLoading && location.pathname !== "/post-signup") {
     return (
       <div className="min-h-screen bg-gray-50 flex items-center justify-center">
         <div className="text-center">
@@ -72,9 +80,9 @@ export const OrganizationProvider = ({
     <OrganizationContext.Provider
       value={{
         currentOrganization: currentOrganization || null,
-        organizations: organizations || [],
-        teams: teams || [],
-        members: members || [],
+        organizations,
+        teams,
+        members,
         isLoading,
         error,
         createOrganization,

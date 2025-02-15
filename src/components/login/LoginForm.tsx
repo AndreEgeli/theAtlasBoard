@@ -63,7 +63,7 @@ export default function LoginForm() {
 
       <Tabs defaultValue="login" className="w-full">
         <TabsList className="grid w-full grid-cols-2">
-          <TabsTrigger value="login">Login</TabsTrigger>
+          <TabsTrigger value="login">Sign In</TabsTrigger>
           <TabsTrigger value="signup">Sign Up</TabsTrigger>
         </TabsList>
         <div className="min-h-[240px]">

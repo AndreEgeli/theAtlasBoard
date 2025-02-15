@@ -1,7 +1,10 @@
 import React, { createContext, useContext, useEffect, useState } from "react";
 import { supabase } from "../lib/supabase";
-import type { AuthUser, AuthError } from "../types/auth";
 import { useNavigate } from "react-router-dom";
+import { useQueryClient } from "@tanstack/react-query";
+import { AuthError, AuthUser } from "@supabase/supabase-js";
+import { UserService } from "@/api/services/UserService";
+import { User } from "@/types/index";
 
 interface AuthContextType {
   user: AuthUser | null;
@@ -16,41 +19,50 @@ interface AuthContextType {
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
 export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
-  const [user, setUser] = useState<AuthUser | null>(null);
+  const [user, setUser] = useState<User | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<AuthError | null>(null);
   const navigate = useNavigate();
+  const queryClient = useQueryClient();
+  const userService = new UserService();
 
-  // Helper function to check if user has any organizations
-  const checkUserOrganizations = async (userId: string) => {
-    const { data: orgMemberships, error } = await supabase
-      .from("organization_members")
-      .select("organization_id")
-      .eq("user_id", userId)
-      .limit(1);
-
-    if (error) {
-      console.error("Error checking organizations:", error);
-      return false;
-    }
-
-    return orgMemberships && orgMemberships.length > 0;
+  const handleInvalidUser = async () => {
+    console.log("Handling invalid user - clearing all state");
+    setLoading(true);
+    queryClient.clear();
+    localStorage.clear();
+    indexedDB.deleteDatabase("supabase-auth-token");
+    await supabase.auth.signOut();
+    setUser(null);
+    setLoading(false);
+    navigate("/login", { replace: true });
   };
 
   useEffect(() => {
+    let mounted = true;
+    console.log("Auth effect running");
+
     const checkSession = async () => {
+      console.log("Checking session...");
       try {
-        const {
-          data: { session },
-          error: sessionError,
-        } = await supabase.auth.getSession();
-        setUser(session?.user ?? null);
-      } catch (error) {
-        navigate("/login");
-        console.error("Session check error:", error);
-        setUser(null);
-      } finally {
+        const user = await userService.getCurrentUser();
+
+        if (!mounted) return;
+
+        if (!user) {
+          console.log("No user found");
+          await handleInvalidUser();
+          return;
+        }
+
+        console.log("Valid user found, setting state");
+        setUser(user);
         setLoading(false);
+      } catch (error) {
+        console.error("Session check error:", error);
+        if (mounted) {
+          await handleInvalidUser();
+        }
       }
     };
 
@@ -58,15 +70,48 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
 
     const {
       data: { subscription },
-    } = supabase.auth.onAuthStateChange(async (_event, session) => {
-      console.log("Auth state changed:", _event, session?.user?.id);
+    } = supabase.auth.onAuthStateChange(async (event, session) => {
+      console.log("Auth state changed:", event, session?.user?.id);
 
-      setUser(session?.user ?? null);
+      if (!mounted) return;
+
+      if (event === "SIGNED_OUT") {
+        setUser(null);
+        setLoading(false);
+        return;
+      }
+
+      if (session?.user) {
+        try {
+          const user = await userService.getCurrentUser();
+
+          if (!mounted) return;
+
+          if (!user) {
+            console.log("No user found after auth state change");
+            await handleInvalidUser();
+            return;
+          }
+
+          setUser(user);
+        } catch (error) {
+          console.error("Error checking user:", error);
+          if (mounted) {
+            await handleInvalidUser();
+          }
+        }
+      } else {
+        setUser(null);
+      }
+
       setLoading(false);
     });
 
-    return () => subscription.unsubscribe();
-  }, [navigate]);
+    return () => {
+      mounted = false;
+      subscription.unsubscribe();
+    };
+  }, [navigate, queryClient]);
 
   const signIn = async (email: string, password: string) => {
     setLoading(true);
@@ -76,9 +121,6 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
         password,
       });
       if (error) throw error;
-
-      // First check if user exists in organization_members
-      const hasOrg = await checkUserOrganizations(data.user.id);
 
       setUser(data.user);
 
