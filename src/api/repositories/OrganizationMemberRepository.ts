@@ -21,7 +21,7 @@ export class OrganizationMemberRepository extends BaseRepository<
         users (
           id,
           email,
-          user_metadata
+          name
         )
       `
       )

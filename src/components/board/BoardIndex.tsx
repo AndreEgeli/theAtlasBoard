@@ -1,18 +1,36 @@
 import { useBoards } from "@/api/hooks/useBoards";
-import { useOrganization } from "@/contexts/OrganizationContext";
+import { useAuth } from "@/hooks/useAuth";
+import { useQuery } from "@tanstack/react-query";
+import { OrganizationService } from "@/api/services/OrganizationService";
 import { Layout, Plus, ArrowRight } from "lucide-react";
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 
+const organizationService = new OrganizationService();
+
 export const BoardIndex = () => {
-  const { organization } = useOrganization();
+  const { currentOrganization: organization } = useAuth();
   const { boards, createBoard, isCreating } = useBoards();
+
+  // Only load teams when we need them for board creation
+  const { data: teams = [] } = useQuery({
+    queryKey: ["teams", organization?.id],
+    queryFn: () => organizationService.getTeams(organization!.id),
+    enabled: !!organization?.id,
+    staleTime: 1000 * 60 * 5, // 5 minutes
+  });
+
   const [newBoardName, setNewBoardName] = useState("");
   const navigate = useNavigate();
 
   const handleCreateBoard = async () => {
-    if (newBoardName.trim()) {
-      const newBoard = await createBoard({ name: newBoardName.trim() });
+    if (newBoardName.trim() && organization && teams.length > 0) {
+      // Get the default team (organization-wide team)
+      const defaultTeam = teams.find((team) => team.is_org_wide) || teams[0];
+      const newBoard = await createBoard({
+        name: newBoardName.trim(),
+        teamId: defaultTeam.id,
+      });
       setNewBoardName("");
       navigate(`/board/${newBoard.id}`);
     }
@@ -45,11 +63,13 @@ export const BoardIndex = () => {
             />
             <button
               onClick={handleCreateBoard}
-              disabled={isCreating || !newBoardName.trim()}
+              disabled={
+                isCreating || !newBoardName.trim() || teams.length === 0
+              }
               className="w-full flex items-center justify-center gap-2 px-4 py-2 bg-blue-500 text-white rounded-lg hover:bg-blue-600 disabled:opacity-50 disabled:cursor-not-allowed"
             >
               <Plus size={20} />
-              Create New Board
+              {teams.length === 0 ? "No teams available" : "Create New Board"}
             </button>
           </div>
         </div>

@@ -10,7 +10,23 @@ export class BoardService {
   }
 
   async getBoards() {
-    return this.boardRepo.findMany();
+    // Get boards for the user's teams directly to avoid RLS issues
+    const { data, error } = await supabase
+      .from("boards")
+      .select(
+        `
+        id,
+        name,
+        created_at,
+        team_id,
+        is_private,
+        created_by
+      `
+      )
+      .order("created_at", { ascending: false });
+
+    if (error) throw error;
+    return data;
   }
 
   async getBoardDetails(boardId: string) {

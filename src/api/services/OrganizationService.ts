@@ -30,41 +30,20 @@ export class OrganizationService {
 
   async createOrganization(name: string, userId: string) {
     try {
-      // Create the organization
-      const organization = await this.orgRepo.create({
-        name,
-        created_by: userId,
-      });
+      const { data, error } = await this.supabase.rpc(
+        "create_organization_with_setup",
+        {
+          p_name: name,
+          p_user_id: userId,
+        }
+      );
 
-      // Create organization membership
-      await this.orgMemberRepo.create({
-        organization_id: organization.id,
-        user_id: userId,
-        role: "owner",
-      });
-
-      // Check if this is the user's first organization
-      const userOrgs = await this.orgRepo.findUserOrganizations(userId);
-      if (userOrgs.length === 1) {
-        await this.setActiveOrganization(organization.id);
+      if (error) {
+        console.error("Error creating organization:", error);
+        throw new Error(error.message || "Failed to create organization");
       }
 
-      // Create default team
-      const team = await this.teamRepo.create({
-        organization_id: organization.id,
-        name: "Default Team",
-        is_org_wide: true,
-        created_by: userId,
-      });
-
-      // Create team membership
-      await this.teamMemberRepo.create({
-        team_id: team.id,
-        user_id: userId,
-        role: "owner",
-      });
-
-      return this.orgRepo.findWithMembers(organization.id);
+      return data;
     } catch (error) {
       console.error("Error creating organization:", error);
       throw new Error(
@@ -129,33 +108,30 @@ export class OrganizationService {
   }
 
   async acceptInvite(token: string, userId: string) {
-    const invite = await this.inviteRepo.acceptInvite(token, userId);
-
-    if (!invite) {
-      throw new Error("Invite not found");
-    }
-
-    if (!invite.organization_id) {
-      // invite Should always have an organization_id
-      throw new Error("Invite does not have an organization");
-    }
-
-    // Add user to organization
-    await this.orgMemberRepo.create({
-      organization_id: invite.organization_id,
-      user_id: userId,
-      role: invite.role,
+    const { error } = await this.supabase.rpc("accept_invitation", {
+      p_token: token,
+      p_user_id: userId,
     });
 
-    await this.setActiveOrganization(invite.organization_id);
-
-    return invite.organization_id;
+    if (error) {
+      console.error("Error accepting invitation:", error);
+      throw new Error("Failed to accept invitation");
+    }
   }
 
   async setActiveOrganization(organizationId: string) {
-    const { error } = await supabase.auth.updateUser({
-      data: { active_organization_id: organizationId },
-    });
+    const {
+      data: { user },
+      error: authError,
+    } = await supabase.auth.getUser();
+
+    if (authError) throw authError;
+    if (!user) throw new Error("No authenticated user");
+
+    const { error } = await supabase
+      .from("users")
+      .update({ active_organization_id: organizationId })
+      .eq("id", user.id);
 
     if (error) throw error;
   }
@@ -170,14 +146,16 @@ export class OrganizationService {
         return null;
       }
 
-      const {
-        data: { user },
-        error,
-      } = await supabase.auth.getUser();
+      // Get active organization from public.users table
+      const { data: user, error: userError } = await supabase
+        .from("users")
+        .select("active_organization_id")
+        .eq("id", userId)
+        .single();
 
-      if (error) throw error;
+      if (userError) throw userError;
 
-      const activeOrgId = user?.user_metadata?.active_organization_id;
+      const activeOrgId = user?.active_organization_id;
 
       if (!activeOrgId) {
         // Get first organization if no active one is set
@@ -234,30 +212,6 @@ export class OrganizationService {
     }
 
     await this.teamMemberRepo.delete(userId);
-  }
-
-  async addMember(
-    organizationId: string,
-    userId: string,
-    role: "admin" | "member" = "member"
-  ) {
-    return this.orgMemberRepo.create({
-      organization_id: organizationId,
-      user_id: userId,
-      role,
-    });
-  }
-
-  async removeMember(organizationId: string, userId: string) {
-    const members = await this.orgMemberRepo.findByOrganization(organizationId);
-    const ownerCount = members.filter((m) => m.role === "owner").length;
-    const member = members.find((m) => m.user_id === userId);
-
-    if (member?.role === "owner" && ownerCount <= 1) {
-      throw new Error("Cannot remove the last owner of the organization");
-    }
-
-    return this.orgMemberRepo.delete(userId);
   }
 
   async updateOrganization(

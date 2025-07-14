@@ -1,12 +1,9 @@
 import React, { useState } from "react";
-import { useNavigate } from "react-router-dom";
-import { useAuth } from "@/contexts/AuthContext";
-import { useOrganization } from "@/api/hooks/useOrganization";
+import { useAuth } from "@/hooks/useAuth";
 import {
   Card,
   CardHeader,
   CardContent,
-  CardFooter,
 } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -14,17 +11,20 @@ import { Building2, Users, Loader2 } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 export function PostSignupFlow() {
-  const { user, loading: authLoading } = useAuth();
-  const navigate = useNavigate();
+  const { 
+    pendingInvites, 
+    acceptInvite, 
+    createOrganization, 
+    isCreatingOrg, 
+    isAcceptingInvite,
+    isLoading
+  } = useAuth();
   const [orgName, setOrgName] = useState("");
   const [error, setError] = useState<string | null>(null);
-  const { pendingInvites, acceptInvite, createOrganization, isCreating } =
-    useOrganization();
 
   const handleAcceptInvite = async (token: string) => {
     try {
       await acceptInvite(token);
-      navigate(`/`);
     } catch (error) {
       console.error("Error accepting invite:", error);
     }
@@ -38,7 +38,6 @@ export function PostSignupFlow() {
 
     try {
       await createOrganization(orgName.trim());
-      navigate("/");
     } catch (err) {
       setError(
         err instanceof Error ? err.message : "Failed to create organization"
@@ -47,8 +46,7 @@ export function PostSignupFlow() {
     }
   };
 
-  // Show loading state while either auth or invites are loading
-  if (authLoading) {
+  if (isLoading) {
     return (
       <div className="min-h-screen bg-gradient-to-b from-gray-50 to-gray-100 flex items-center justify-center">
         <div className="text-center">
@@ -62,7 +60,6 @@ export function PostSignupFlow() {
   return (
     <div className="min-h-screen bg-gradient-to-b from-gray-50 to-gray-100 flex flex-col items-center px-4 py-16">
       <div className="max-w-4xl w-full mx-auto space-y-8">
-        {/* Welcome Header */}
         <div className="text-center space-y-4 mb-12">
           <h1 className="text-4xl font-bold tracking-tight text-gray-900">
             Welcome to Atlasboard
@@ -76,14 +73,13 @@ export function PostSignupFlow() {
 
         <div
           className={cn("grid gap-8", {
-            "md:grid-cols-2": pendingInvites.length > 0,
-            "max-w-md mx-auto w-full": pendingInvites.length === 0,
+            "md:grid-cols-2": pendingInvites && pendingInvites.length > 0,
+            "max-w-md mx-auto w-full": !pendingInvites || pendingInvites.length === 0,
           })}
         >
-          {/* Create Organization Card */}
           <Card
             className={cn("shadow-lg", {
-              "md:col-span-2": pendingInvites.length === 0,
+              "md:col-span-2": !pendingInvites || pendingInvites.length === 0,
             })}
           >
             <CardHeader>
@@ -94,7 +90,7 @@ export function PostSignupFlow() {
                 </h2>
               </div>
               <p className="text-sm text-gray-500">
-                {pendingInvites.length === 0
+                {pendingInvites && pendingInvites.length === 0
                   ? "Get started by creating your organization workspace"
                   : "Set up your own organization and start inviting team members"}
               </p>
@@ -124,21 +120,20 @@ export function PostSignupFlow() {
                   </div>
                   <Button
                     type="submit"
-                    disabled={isCreating}
+                    disabled={isCreatingOrg}
                     className="w-full"
                   >
-                    {isCreating && (
+                    {isCreatingOrg && (
                       <Loader2 className="mr-2 h-4 w-4 animate-spin" />
                     )}
-                    {isCreating ? "Creating..." : "Create Organization"}
+                    {isCreatingOrg ? "Creating..." : "Create Organization"}
                   </Button>
                 </div>
               </form>
             </CardContent>
           </Card>
 
-          {/* Pending Invites Card */}
-          {pendingInvites.length > 0 && (
+          {pendingInvites && pendingInvites.length > 0 && (
             <Card className="shadow-lg">
               <CardHeader>
                 <div className="flex items-center gap-2 mb-2">
@@ -166,7 +161,9 @@ export function PostSignupFlow() {
                           onClick={() => handleAcceptInvite(invite.token)}
                           variant="secondary"
                           className="w-full"
+                          disabled={isAcceptingInvite}
                         >
+                          {isAcceptingInvite && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
                           Accept Invite
                         </Button>
                       </CardContent>
@@ -178,7 +175,6 @@ export function PostSignupFlow() {
           )}
         </div>
 
-        {/* Information Cards */}
         <div className="grid md:grid-cols-3 gap-6 mt-12">
           <Card>
             <CardContent className="pt-6">

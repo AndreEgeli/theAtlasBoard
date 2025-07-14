@@ -30,7 +30,7 @@ export class TaskRepository extends BaseRepository<"tasks", Task> {
           users (
             id,
             email,
-            user_metadata
+            name
           )
         )
       `

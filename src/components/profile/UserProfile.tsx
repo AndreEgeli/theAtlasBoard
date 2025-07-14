@@ -1,7 +1,7 @@
 import { useState, useRef } from "react";
 import { Upload, Save } from "lucide-react";
 import { supabase } from "../../lib/supabase";
-import { useAuth } from "../../contexts/AuthContext";
+import { useAuth } from "@/hooks/useAuth";
 
 export function UserProfile() {
   const { user } = useAuth();

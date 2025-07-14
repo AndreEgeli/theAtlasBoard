@@ -10,7 +10,7 @@ import type {
   TodoItemUpdate,
   Tag,
 } from "@/types";
-import { useAuth } from "@/contexts/AuthContext";
+import { useAuth } from "@/hooks/useAuth";
 
 const taskService = new TaskService();
 
@@ -22,6 +22,7 @@ export function useTasks(boardId: string) {
     queryKey,
     queryFn: () => taskService.getTasks(boardId),
     enabled: !!boardId,
+    staleTime: 1000 * 60 * 2, // Tasks change more frequently, 2 minutes
   });
 
   const createTaskMutation = useOptimistic<FullTask[], Omit<TaskInsert, "id">>({

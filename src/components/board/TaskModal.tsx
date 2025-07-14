@@ -4,7 +4,7 @@ import type { Task, Tag as TagType } from "../../types";
 import { Check, Plus, Tag, X } from "lucide-react";
 import { Trash2 } from "lucide-react";
 import { getStatusButton } from "@/utils/taskStatus";
-import { useAuth } from "@/contexts/AuthContext";
+import { useAuth } from "@/hooks/useAuth";
 
 interface TaskModalProps {
   boardId: string;

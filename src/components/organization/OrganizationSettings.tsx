@@ -1,11 +1,13 @@
 import { useState } from "react";
 import { Save, Trash2 } from "lucide-react";
-import { useOrganization } from "../../contexts/OrganizationContext";
+import { useUpdateOrganization, useSwitchOrganization, useUserOrganizations } from "@/api/hooks/useOrganization";
+import { useAuth } from "@/hooks/useAuth";
 import { supabase } from "../../lib/supabase";
 import { useNavigate } from "react-router-dom";
 
 export function OrganizationSettings() {
-  const { currentOrganization, switchOrganization } = useOrganization();
+  const { currentOrganization } = useAuth();
+  const { mutate: switchOrganization } = useSwitchOrganization();
   const [name, setName] = useState(currentOrganization?.name ?? "");
   const [isUpdating, setIsUpdating] = useState(false);
   const [isDeleting, setIsDeleting] = useState(false);

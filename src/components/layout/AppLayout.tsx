@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { Outlet, useNavigate, useLocation, Navigate } from "react-router-dom";
-import { useOrganization } from "../../contexts/OrganizationContext";
+import { useAuth } from "@/hooks/useAuth";
 import {
   LayoutGrid,
   Users,
@@ -11,7 +11,7 @@ import {
 } from "lucide-react";
 
 export function AppLayout() {
-  const { currentOrganization } = useOrganization();
+  const { currentOrganization } = useAuth();
   const [isCollapsed, setIsCollapsed] = useState(false);
   const navigate = useNavigate();
   const location = useLocation();

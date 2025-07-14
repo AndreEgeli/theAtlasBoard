@@ -1,63 +1,43 @@
 import { useState } from "react";
 import { Plus, Users } from "lucide-react";
-import { useOrganization } from "../../contexts/OrganizationContext";
-import { Team, OrganizationMember } from "../../types";
-import { supabase } from "../../lib/supabase";
+import {
+  useOrganizationTeams,
+  useOrganizationMembers,
+  useCreateTeam,
+  useInviteMember,
+} from "@/api/hooks/useOrganization";
+import { Team } from "../../types";
+import { useAuth } from "@/hooks/useAuth";
 
 export function TeamManagement() {
-  const { currentOrganization, teams, members } = useOrganization();
+  const { currentOrganization } = useAuth();
+  const { data: teams = [] } = useOrganizationTeams();
+  const { data: members = [] } = useOrganizationMembers();
+  const { mutate: createTeam, isPending: isCreatingTeam } = useCreateTeam();
+  const { mutate: inviteMember, isPending: isInvitingMember } =
+    useInviteMember();
+
   const [selectedTeam, setSelectedTeam] = useState<Team | null>(null);
   const [newTeamName, setNewTeamName] = useState("");
   const [inviteEmail, setInviteEmail] = useState("");
-  const [isCreatingTeam, setIsCreatingTeam] = useState(false);
 
   if (!currentOrganization) return null;
 
   const handleCreateTeam = async () => {
     if (!newTeamName.trim() || isCreatingTeam) return;
-    setIsCreatingTeam(true);
-
     try {
-      const { data: team, error } = await supabase
-        .from("teams")
-        .insert({
-          name: newTeamName.trim(),
-          organization_id: currentOrganization?.id,
-        })
-        .select()
-        .single();
-
-      if (error) throw error;
+      createTeam({ name: newTeamName.trim() });
       setNewTeamName("");
-      setSelectedTeam(team);
     } catch (error) {
       console.error("Error creating team:", error);
-    } finally {
-      setIsCreatingTeam(false);
     }
   };
 
   const handleInviteMember = async () => {
-    if (!inviteEmail.trim()) return;
-
+    if (!inviteEmail.trim() || isInvitingMember) return;
     try {
-      const { data: invite, error } = await supabase
-        .from("organization_invites")
-        .insert({
-          organization_id: currentOrganization?.id,
-          email: inviteEmail.trim(),
-          token: crypto.randomUUID(),
-        })
-        .select()
-        .single();
-
-      if (error) throw error;
+      inviteMember({ email: inviteEmail.trim() });
       setInviteEmail("");
-
-      // Generate and copy invite link
-      const inviteLink = `${window.location.origin}/invite/${invite.token}`;
-      await navigator.clipboard.writeText(inviteLink);
-      alert("Invite link copied to clipboard!");
     } catch (error) {
       console.error("Error creating invite:", error);
     }
@@ -153,7 +133,16 @@ export function TeamManagement() {
                     >
                       <div className="flex items-center gap-3">
                         <Users size={20} className="text-gray-500" />
-                        <span>{member.user_id}</span>
+                        <div>
+                          <div className="font-medium">
+                            {member.users?.name ||
+                              member.users?.email ||
+                              "Unknown User"}
+                          </div>
+                          <div className="text-sm text-gray-500">
+                            {member.users?.email}
+                          </div>
+                        </div>
                       </div>
                       <span className="text-sm text-gray-500 capitalize">
                         {member.role}

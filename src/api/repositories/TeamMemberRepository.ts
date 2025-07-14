@@ -21,7 +21,7 @@ export class TeamMemberRepository extends BaseRepository<
         users (
           id,
           email,
-          user_metadata
+          name
         )
       `
       )

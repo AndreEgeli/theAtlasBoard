@@ -1,20 +1,25 @@
-import { useQuery, useMutation } from "@tanstack/react-query";
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { BoardService } from "../services/BoardService";
 import type { BoardUpdate } from "@/types";
 
 const boardService = new BoardService();
 
 export function useBoards() {
+  const queryClient = useQueryClient();
   const queryKey = ["boards"];
 
   const { data: boards = [], isLoading } = useQuery({
     queryKey,
     queryFn: () => boardService.getBoards(),
+    staleTime: 1000 * 60 * 5, // Boards don't change often, 5 minutes
   });
 
   const createBoardMutation = useMutation({
     mutationFn: ({ name, teamId }: { name: string; teamId: string }) =>
       boardService.createBoard({ name, teamId }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["boards"] });
+    },
   });
 
   return {

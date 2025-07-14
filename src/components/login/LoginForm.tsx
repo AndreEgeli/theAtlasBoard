@@ -1,46 +1,28 @@
 import { useState } from "react";
-import { useNavigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Github } from "lucide-react";
-import { useAuth } from "../../contexts/AuthContext";
+import { useAuth } from "@/hooks/useAuth";
 
 export default function LoginForm() {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [name, setName] = useState("");
-  const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  const { signIn, signUp, signInWithGithub } = useAuth();
-  const navigate = useNavigate();
+  const { signIn, signUp, isSigningIn, isSigningUp } = useAuth();
 
   const handleSubmit = async (e: React.FormEvent, type: "login" | "signup") => {
     e.preventDefault();
-    setLoading(true);
     setError(null);
 
     try {
       if (type === "signup") {
-        await signUp(email, password);
-        // Navigate is handled in AuthContext after signup
+        await signUp({ email, password, name });
       } else {
-        await signIn(email, password);
-        navigate("/");
+        await signIn({ email, password });
       }
-    } catch (err) {
-      const message = err instanceof Error ? err.message : "An error occurred";
-      setError(message);
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  const handleGithubSignIn = async () => {
-    try {
-      await signInWithGithub();
-      // Navigation will happen automatically after OAuth callback
     } catch (err) {
       const message = err instanceof Error ? err.message : "An error occurred";
       setError(message);
@@ -67,8 +49,6 @@ export default function LoginForm() {
           <TabsTrigger value="signup">Sign Up</TabsTrigger>
         </TabsList>
         <div className="min-h-[240px]">
-          {" "}
-          {/* Fixed height container */}
           <TabsContent value="login" className="mt-8 space-y-6">
             <form onSubmit={(e) => handleSubmit(e, "login")}>
               <div className="space-y-4">
@@ -82,7 +62,7 @@ export default function LoginForm() {
                     placeholder="Email address"
                     value={email}
                     onChange={(e) => setEmail(e.target.value)}
-                    disabled={loading}
+                    disabled={isSigningIn}
                   />
                 </div>
                 <div>
@@ -95,13 +75,13 @@ export default function LoginForm() {
                     placeholder="Password"
                     value={password}
                     onChange={(e) => setPassword(e.target.value)}
-                    disabled={loading}
+                    disabled={isSigningIn}
                   />
                 </div>
               </div>
 
-              <Button type="submit" className="w-full mt-6" disabled={loading}>
-                {loading ? "Signing in..." : "Sign in"}
+              <Button type="submit" className="w-full mt-6" disabled={isSigningIn}>
+                {isSigningIn ? "Signing in..." : "Sign in"}
               </Button>
             </form>
           </TabsContent>
@@ -118,7 +98,7 @@ export default function LoginForm() {
                     placeholder="Full Name"
                     value={name}
                     onChange={(e) => setName(e.target.value)}
-                    disabled={loading}
+                    disabled={isSigningUp}
                   />
                 </div>
                 <div>
@@ -130,8 +110,8 @@ export default function LoginForm() {
                     required
                     placeholder="Email address"
                     value={email}
-                    onChange={(e) => setEmail(e.target.value)}
-                    disabled={loading}
+                    onChange={(e) => setEmail(e.targe.value)}
+                    disabled={isSigningUp}
                   />
                 </div>
                 <div>
@@ -144,13 +124,13 @@ export default function LoginForm() {
                     placeholder="Password"
                     value={password}
                     onChange={(e) => setPassword(e.target.value)}
-                    disabled={loading}
+                    disabled={isSigningUp}
                   />
                 </div>
               </div>
 
-              <Button type="submit" className="w-full mt-6" disabled={loading}>
-                {loading ? "Creating account..." : "Sign up"}
+              <Button type="submit" className="w-full mt-6" disabled={isSigningUp}>
+                {isSigningUp ? "Creating account..." : "Sign up"}
               </Button>
             </form>
           </TabsContent>
@@ -173,8 +153,7 @@ export default function LoginForm() {
           <Button
             variant="outline"
             className="w-full"
-            onClick={handleGithubSignIn}
-            disabled={loading}
+            disabled={isSigningIn || isSigningUp}
           >
             <Github className="mr-2 h-4 w-4" />
             GitHub

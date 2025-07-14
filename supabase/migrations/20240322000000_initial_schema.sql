@@ -38,7 +38,7 @@ CREATE TABLE organizations (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   name TEXT NOT NULL,
   created_at TIMESTAMPTZ DEFAULT NOW(),
-  created_by UUID REFERENCES users(id) NOT NULL  -- Changed to reference users instead of auth.users
+  created_by UUID REFERENCES users(id) NOT NULL
 );
 
 -- Add foreign key for active_organization_id now that organizations exists
@@ -50,7 +50,7 @@ ALTER TABLE users
 -- Organization members
 CREATE TABLE organization_members (
   organization_id UUID REFERENCES organizations(id) ON DELETE CASCADE,
-  user_id UUID REFERENCES users(id) ON DELETE CASCADE,  -- Changed to reference users
+  user_id UUID REFERENCES users(id) ON DELETE CASCADE, 
   role org_role NOT NULL DEFAULT 'member',
   created_at TIMESTAMPTZ DEFAULT NOW(),
   PRIMARY KEY (organization_id, user_id)
@@ -63,13 +63,13 @@ CREATE TABLE teams (
   name TEXT NOT NULL,
   is_org_wide BOOLEAN DEFAULT FALSE,
   created_at TIMESTAMPTZ DEFAULT NOW(),
-  created_by UUID REFERENCES auth.users(id) NOT NULL
+  created_by UUID REFERENCES users(id) NOT NULL
 );
 
 -- Team members
 CREATE TABLE team_members (
   team_id UUID REFERENCES teams(id) ON DELETE CASCADE,
-  user_id UUID REFERENCES auth.users(id) ON DELETE CASCADE,
+  user_id UUID REFERENCES users(id) ON DELETE CASCADE,
   role team_role NOT NULL DEFAULT 'editor',
   created_at TIMESTAMPTZ DEFAULT NOW(),
   PRIMARY KEY (team_id, user_id)
@@ -82,7 +82,7 @@ CREATE TABLE boards (
   team_id UUID REFERENCES teams(id) ON DELETE CASCADE,
   is_private BOOLEAN DEFAULT FALSE,
   created_at TIMESTAMPTZ DEFAULT NOW(),
-  created_by UUID REFERENCES auth.users(id) NOT NULL,
+  created_by UUID REFERENCES users(id) NOT NULL,
   updated_at TIMESTAMPTZ DEFAULT NOW()
 );
 
@@ -98,15 +98,15 @@ CREATE TABLE tasks (
   deadline_at TIMESTAMPTZ,
   "order" INTEGER DEFAULT 0,
   created_at TIMESTAMPTZ DEFAULT NOW(),
-  created_by UUID REFERENCES auth.users(id) NOT NULL,
+  created_by UUID REFERENCES users(id) NOT NULL,
   updated_at TIMESTAMPTZ DEFAULT NOW()
 );
 
 CREATE TABLE task_assignees (
   task_id UUID REFERENCES tasks(id) ON DELETE CASCADE,
-  user_id UUID REFERENCES auth.users(id) ON DELETE CASCADE,
+  user_id UUID REFERENCES users(id) ON DELETE CASCADE,
   assigned_at TIMESTAMPTZ DEFAULT NOW(),
-  assigned_by UUID REFERENCES auth.users(id) NOT NULL,
+  assigned_by UUID REFERENCES users(id) NOT NULL,
   PRIMARY KEY (task_id, user_id)
 );
 
@@ -117,7 +117,7 @@ CREATE TABLE todos (
   title TEXT NOT NULL,
   is_completed BOOLEAN DEFAULT FALSE,
   created_at TIMESTAMPTZ DEFAULT NOW(),
-  created_by UUID REFERENCES auth.users(id) NOT NULL,
+  created_by UUID REFERENCES users(id) NOT NULL,
   updated_at TIMESTAMPTZ DEFAULT NOW()
 );
 
@@ -128,7 +128,7 @@ CREATE TABLE tags (
   name TEXT NOT NULL,
   color TEXT NOT NULL,
   created_at TIMESTAMPTZ DEFAULT NOW(),
-  created_by UUID REFERENCES auth.users(id) NOT NULL
+  created_by UUID REFERENCES users(id) NOT NULL
 );
 
 -- Task tags
@@ -147,9 +147,9 @@ CREATE TABLE organization_invites (
   token TEXT NOT NULL UNIQUE,
   expires_at TIMESTAMPTZ NOT NULL DEFAULT (NOW() + INTERVAL '7 days'),
   created_at TIMESTAMPTZ DEFAULT NOW(),
-  created_by UUID REFERENCES auth.users(id) NOT NULL,
+  created_by UUID REFERENCES users(id) NOT NULL,
   accepted_at TIMESTAMPTZ,
-  accepted_by UUID REFERENCES auth.users(id)
+  accepted_by UUID REFERENCES users(id)
 );
 
 -- ============= TRIGGERS =============
@@ -171,9 +171,19 @@ CREATE TRIGGER update_users_updated_at
 -- Create trigger for new auth users
 CREATE OR REPLACE FUNCTION public.handle_new_user()
 RETURNS TRIGGER AS $$
+DECLARE
+  v_invite_exists BOOLEAN;
 BEGIN
-  INSERT INTO public.users (id, email)
-  VALUES (NEW.id, NEW.email);
+  -- Check if an invite exists for the new user's email
+  SELECT EXISTS(
+    SELECT 1 FROM public.organization_invites
+    WHERE email = NEW.email AND accepted_at IS NULL
+  ) INTO v_invite_exists;
+
+  -- Create a new user record
+  INSERT INTO public.users (id, email, name)
+  VALUES (NEW.id, NEW.email, NEW.raw_user_meta_data->>'full_name');
+
   RETURN NEW;
 END;
 $$ LANGUAGE plpgsql SECURITY DEFINER;
@@ -181,6 +191,48 @@ $$ LANGUAGE plpgsql SECURITY DEFINER;
 CREATE TRIGGER on_auth_user_created
   AFTER INSERT ON auth.users
   FOR EACH ROW EXECUTE PROCEDURE public.handle_new_user();
+
+-- Function to accept an organization invitation
+CREATE OR REPLACE FUNCTION accept_invitation(
+  p_token TEXT,
+  p_user_id UUID
+)
+RETURNS VOID AS $$
+DECLARE
+  v_invite organization_invites%ROWTYPE;
+  v_org_wide_team_id UUID;
+BEGIN
+  -- Find the invitation
+  SELECT * INTO v_invite
+  FROM organization_invites
+  WHERE token = p_token AND expires_at > NOW() AND accepted_at IS NULL;
+
+  IF v_invite IS NULL THEN
+    RAISE EXCEPTION 'Invitation not found or expired';
+  END IF;
+
+  -- Add the user to the organization
+  INSERT INTO organization_members (organization_id, user_id, role)
+  VALUES (v_invite.organization_id, p_user_id, v_invite.role);
+
+  -- Find the organization-wide team
+  SELECT id INTO v_org_wide_team_id
+  FROM teams
+  WHERE organization_id = v_invite.organization_id AND is_org_wide = TRUE;
+
+  -- Add the user to the organization-wide team
+  IF v_org_wide_team_id IS NOT NULL THEN
+    INSERT INTO team_members (team_id, user_id, role)
+    VALUES (v_org_wide_team_id, p_user_id, 'editor'); -- Or a default role
+  END IF;
+
+  -- Mark the invitation as accepted
+  UPDATE organization_invites
+  SET accepted_at = NOW(), accepted_by = p_user_id
+  WHERE id = v_invite.id;
+
+END;
+$$ LANGUAGE plpgsql SECURITY DEFINER;
 
 -- ============= HELPER FUNCTIONS =============
 -- Check if user exists
@@ -219,26 +271,26 @@ END;
 $$ LANGUAGE plpgsql SECURITY DEFINER;
 
 -- Get user's role in team
-CREATE OR REPLACE FUNCTION get_team_role(team_id UUID)
+CREATE OR REPLACE FUNCTION get_team_role(p_team_id UUID)
 RETURNS team_role AS $$
 BEGIN
   RETURN (
-    SELECT role FROM team_members 
-    WHERE team_id = team_id 
-    AND user_id = auth.uid()
+    SELECT tm.role FROM team_members tm
+    WHERE tm.team_id = p_team_id 
+    AND tm.user_id = auth.uid()
   );
 END;
 $$ LANGUAGE plpgsql SECURITY DEFINER;
 
 -- Check if user can edit team content
-CREATE OR REPLACE FUNCTION can_edit_team_content(team_id UUID)
+CREATE OR REPLACE FUNCTION can_edit_team_content(p_team_id UUID)
 RETURNS BOOLEAN AS $$
 BEGIN
   RETURN EXISTS (
-    SELECT 1 FROM team_members
-    WHERE team_id = team_id 
-    AND user_id = auth.uid() 
-    AND role IN ('owner', 'editor')
+    SELECT 1 FROM team_members tm
+    WHERE tm.team_id = p_team_id 
+    AND tm.user_id = auth.uid() 
+    AND tm.role IN ('owner', 'editor')
   );
 END;
 $$ LANGUAGE plpgsql SECURITY DEFINER;
@@ -318,31 +370,32 @@ CREATE POLICY "Organization admins and owners can manage teams" ON teams
 -- Team Members
 CREATE POLICY "Team members can view team members" ON team_members
   FOR SELECT USING (
-    team_id IN (
-      SELECT team_id FROM team_members WHERE user_id = auth.uid()
+    EXISTS (
+      SELECT 1 FROM teams t, organization_members om
+      WHERE t.id = team_id
+      AND om.organization_id = t.organization_id
+      AND om.user_id = auth.uid()
     )
   );
 
 CREATE POLICY "Team owners can manage team members" ON team_members
   FOR ALL USING (
-    team_id IN (
-      SELECT team_id FROM team_members 
-      WHERE user_id = auth.uid() AND role = 'owner'
-    )
+    get_team_role(team_members.team_id) = 'owner'
+    OR is_org_admin_or_owner((SELECT organization_id FROM teams WHERE id = team_members.team_id))
   );
 
 -- Boards
 CREATE POLICY "Users can view accessible boards" ON boards
   FOR SELECT USING (
-    (NOT is_private AND team_id IN (
-      SELECT team_id FROM team_members WHERE user_id = auth.uid()
+    (NOT is_private AND boards.team_id IN (
+      SELECT tm.team_id FROM team_members tm WHERE tm.user_id = auth.uid()
     ))
     OR (is_private AND created_by = auth.uid())
   );
 
 CREATE POLICY "Team editors and owners can manage boards" ON boards
   FOR ALL USING (
-    can_edit_team_content(team_id) OR created_by = auth.uid()
+    can_edit_team_content(boards.team_id) OR created_by = auth.uid()
   );
 
 -- Tasks
@@ -360,7 +413,7 @@ CREATE POLICY "Users can view tasks in accessible boards" ON tasks
 CREATE POLICY "Team editors and owners can manage tasks" ON tasks
   FOR ALL USING (
     board_id IN (
-      SELECT id FROM boards WHERE can_edit_team_content(team_id)
+      SELECT id FROM boards WHERE can_edit_team_content(boards.team_id)
     ) OR created_by = auth.uid()
   );
 
@@ -370,8 +423,8 @@ CREATE POLICY "Users can view task assignments" ON task_assignees
     task_id IN (
       SELECT id FROM tasks WHERE board_id IN (
         SELECT id FROM boards WHERE 
-          (NOT is_private AND team_id IN (
-            SELECT team_id FROM team_members WHERE user_id = auth.uid()
+          (NOT is_private AND boards.team_id IN (
+            SELECT tm.team_id FROM team_members tm WHERE tm.user_id = auth.uid()
           ))
           OR (is_private AND created_by = auth.uid())
       )
@@ -382,7 +435,7 @@ CREATE POLICY "Team editors and owners can manage task assignments" ON task_assi
   FOR ALL USING (
     task_id IN (
       SELECT id FROM tasks WHERE board_id IN (
-        SELECT id FROM boards WHERE can_edit_team_content(team_id)
+        SELECT id FROM boards WHERE can_edit_team_content(boards.team_id)
       )
     ) OR assigned_by = auth.uid()
   );
@@ -393,8 +446,8 @@ CREATE POLICY "Users can view todos in accessible tasks" ON todos
     task_id IN (
       SELECT id FROM tasks WHERE board_id IN (
         SELECT id FROM boards WHERE 
-          (NOT is_private AND team_id IN (
-            SELECT team_id FROM team_members WHERE user_id = auth.uid()
+          (NOT is_private AND boards.team_id IN (
+            SELECT tm.team_id FROM team_members tm WHERE tm.user_id = auth.uid()
           ))
           OR (is_private AND created_by = auth.uid())
       )
@@ -405,7 +458,7 @@ CREATE POLICY "Team editors and owners can manage todos" ON todos
   FOR ALL USING (
     task_id IN (
       SELECT id FROM tasks WHERE board_id IN (
-        SELECT id FROM boards WHERE can_edit_team_content(team_id)
+        SELECT id FROM boards WHERE can_edit_team_content(boards.team_id)
       )
     ) OR created_by = auth.uid()
   );
@@ -416,9 +469,24 @@ CREATE POLICY "Organization members can view tags" ON tags
     is_organization_member(organization_id)
   );
 
-CREATE POLICY "Organization admins and owners can manage tags" ON tags
-  FOR ALL USING (
+CREATE POLICY "Organization members can create tags" ON tags
+  FOR INSERT USING (
+    is_organization_member(organization_id)
+  );
+
+CREATE POLICY "Organization admins and owners can update delete tags" ON tags
+  FOR UPDATE USING (
     is_org_admin_or_owner(organization_id)
+  );
+
+CREATE POLICY "Organization admins and owners can delete tags" ON tags
+  FOR DELETE USING (
+    is_org_admin_or_owner(organization_id)
+  );
+
+CREATE POLICY "Tag creators can update their own tags" ON tags
+  FOR UPDATE USING (
+    created_by = auth.uid()
   );
 
 -- Task Tags
@@ -427,8 +495,8 @@ CREATE POLICY "Users can view task tags" ON task_tags
     task_id IN (
       SELECT id FROM tasks WHERE board_id IN (
         SELECT id FROM boards WHERE 
-          (NOT is_private AND team_id IN (
-            SELECT team_id FROM team_members WHERE user_id = auth.uid()
+          (NOT is_private AND boards.team_id IN (
+            SELECT tm.team_id FROM team_members tm WHERE tm.user_id = auth.uid()
           ))
           OR (is_private AND created_by = auth.uid())
       )
@@ -439,7 +507,7 @@ CREATE POLICY "Team editors and owners can manage task tags" ON task_tags
   FOR ALL USING (
     task_id IN (
       SELECT id FROM tasks WHERE board_id IN (
-        SELECT id FROM boards WHERE can_edit_team_content(team_id)
+        SELECT id FROM boards WHERE can_edit_team_content(boards.team_id)
       )
     )
   );
@@ -461,6 +529,72 @@ CREATE POLICY "Invited users can accept their invites" ON organization_invites
   ) WITH CHECK (
     email = auth.email() AND accepted_at IS NULL
   );
+
+-- ============= RPC FUNCTIONS =============
+-- Function to create organization with all required setup
+CREATE OR REPLACE FUNCTION create_organization_with_setup(
+  p_name TEXT,
+  p_user_id UUID
+)
+RETURNS JSON AS $$
+DECLARE
+  v_organization organizations%ROWTYPE;
+  v_team teams%ROWTYPE;
+  v_user_org_count INTEGER;
+  v_result JSON;
+BEGIN
+  -- Check if user exists
+  IF NOT EXISTS(SELECT 1 FROM public.users WHERE id = p_user_id) THEN
+    RAISE EXCEPTION 'User not found';
+  END IF;
+
+  -- Create the organization
+  INSERT INTO public.organizations (name, created_by)
+  VALUES (p_name, p_user_id)
+  RETURNING * INTO v_organization;
+
+  -- Create organization membership (bypasses RLS)
+  INSERT INTO public.organization_members (organization_id, user_id, role)
+  VALUES (v_organization.id, p_user_id, 'owner');
+
+  -- Create default team
+  INSERT INTO public.teams (organization_id, name, is_org_wide, created_by)
+  VALUES (v_organization.id, 'Default Team', TRUE, p_user_id)
+  RETURNING * INTO v_team;
+
+  -- Create team membership (bypasses RLS)
+  INSERT INTO public.team_members (team_id, user_id, role)
+  VALUES (v_team.id, p_user_id, 'owner');
+
+  -- Check if this is the user's first organization
+  SELECT COUNT(*) INTO v_user_org_count
+  FROM public.organization_members
+  WHERE user_id = p_user_id;
+
+  -- If this is their first organization, set it as active
+  IF v_user_org_count = 1 THEN
+    UPDATE public.users
+    SET active_organization_id = v_organization.id
+    WHERE id = p_user_id;
+  END IF;
+
+  -- Return organization with member details
+  SELECT json_build_object(
+    'id', v_organization.id,
+    'name', v_organization.name,
+    'created_at', v_organization.created_at,
+    'created_by', v_organization.created_by,
+    'organization_members', json_build_array(
+      json_build_object(
+        'user_id', p_user_id,
+        'role', 'owner'
+      )
+    )
+  ) INTO v_result;
+
+  RETURN v_result;
+END;
+$$ LANGUAGE plpgsql SECURITY DEFINER;
 
 -- ============= INDEXES =============
 -- Organizations
@@ -504,4 +638,3 @@ CREATE INDEX idx_task_tags_tag ON task_tags(tag_id);
 CREATE INDEX idx_org_invites_org ON organization_invites(organization_id);
 CREATE INDEX idx_org_invites_email ON organization_invites(email);
 CREATE INDEX idx_org_invites_token ON organization_invites(token);
-CREATE INDEX idx_org_invites_expires ON organization_invites(expires_at);

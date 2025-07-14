@@ -18,7 +18,7 @@ A task management application built with React, TypeScript, and Supabase.
 pnpm install
 
 # Install Supabase CLI globally
-npm install -g supabase
+npm i supabase --save-dev
 ```
 
 ### 2. Local Supabase Setup
