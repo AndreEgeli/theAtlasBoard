@@ -8,6 +8,13 @@ export type FullUser = User & {
   avatar_url: string;
 };
 
+// Add missing CellPosition type
+export type CellPosition = {
+  x_index: number;
+  y_index: number;
+  order: number;
+};
+
 export type TeamRole = Database["public"]["Enums"]["team_role"];
 export type OrgRole = Database["public"]["Enums"]["org_role"];
 
@@ -66,6 +73,7 @@ export type FullTask = Task & {
 export type TaskPosition = {
   x_index: number;
   y_index: number;
+  order: number;
 };
 
 export type Tag = Database["public"]["Tables"]["tags"]["Row"];

@@ -3,6 +3,7 @@ import { Task, CellPosition, User, Tag } from "@/types";
 import { TaskCard } from "./TaskCard";
 import { Plus } from "lucide-react";
 import { useTasks } from "@/api/hooks/useTasks";
+import { useAuth } from "@/hooks/useAuth";
 
 const importanceLevels = ["super critical", "critical", "not critical"];
 const timeframeLevels = [">3 hours", "> 1 day", "> 1 week"];
@@ -22,6 +23,7 @@ export function Board({
   onTaskCreated,
   filterTasks,
 }: BoardProps) {
+  const { user } = useAuth();
   const { tasks, createTask, moveTask } = useTasks(boardId);
   const [draggedTaskId, setDraggedTaskId] = useState<string | null>(null);
   const [dragOverTaskId, setDragOverTaskId] = useState<string | null>(null);
@@ -48,7 +50,7 @@ export function Board({
         position: {
           x_index: targetTask.x_index,
           y_index: targetTask.y_index,
-          order: targetTask.order,
+          order: targetTask.order ?? 0,
         },
       });
       moveTask({
@@ -56,7 +58,7 @@ export function Board({
         position: {
           x_index: sourceTask.x_index,
           y_index: sourceTask.y_index,
-          order: sourceTask.order,
+          order: sourceTask.order ?? 0,
         },
       });
     }
@@ -66,13 +68,19 @@ export function Board({
   };
 
   const handleAddTask = async (position: CellPosition) => {
+    if (!user?.id) {
+      console.error("No user authenticated");
+      return;
+    }
+
     const newTask = await createTask({
       title: "New Task",
       description: "",
       x_index: position.x_index,
       y_index: position.y_index,
-      order: tasks.length,
+      order: position.order,
       status: "pending",
+      created_by: user.id,
     });
     onTaskCreated(newTask.id);
   };
