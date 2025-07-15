@@ -6,18 +6,12 @@ import { ArchiveBoard } from "./ArchiveBoard";
 import { TaskModal } from "./TaskModal";
 import { FilterPopover } from "./FilterPopover";
 import { TagManagement } from "./TagManagement";
-import { useBoardDetails } from "@/api/hooks/useBoards";
+import { BoardProvider, useBoardContext } from "@/contexts/BoardContext";
 import { useTags } from "@/api/hooks/useTags";
 import { useFiltering } from "@/api/hooks/useFiltering";
 
-export const BoardWrapper = () => {
-  const { boardId } = useParams();
-  const {
-    board,
-    isLoading: boardLoading,
-    updateBoard,
-    deleteBoard,
-  } = useBoardDetails(boardId ?? "");
+const BoardContent = () => {
+  const { board, isLoadingBoard } = useBoardContext();
   const { tags } = useTags();
   const [selectedTaskId, setSelectedTaskId] = useState<string | null>(null);
   const { filters, setFilters, filterTasks, hasActiveFilters, clearFilters } =
@@ -29,7 +23,7 @@ export const BoardWrapper = () => {
     setSelectedTaskId(taskId);
   };
 
-  if (boardLoading) {
+  if (isLoadingBoard) {
     return (
       <div className="h-screen w-screen flex items-center justify-center">
         <Loader className="animate-spin h-8 w-8 text-blue-500" />
@@ -37,7 +31,7 @@ export const BoardWrapper = () => {
     );
   }
 
-  if (!boardId || !board) {
+  if (!board) {
     return navigate("/");
   }
 
@@ -53,7 +47,7 @@ export const BoardWrapper = () => {
               />
               {location.pathname.endsWith("/archive") && (
                 <button
-                  onClick={() => navigate(`/board/${boardId}`)}
+                  onClick={() => navigate(`/board/${board.id}`)}
                   className="flex items-center gap-2 px-3 py-2 text-gray-700 hover:bg-gray-100 rounded-lg transition-colors"
                 >
                   <ArrowLeft size={20} />
@@ -85,15 +79,10 @@ export const BoardWrapper = () => {
         </div>
 
         {location.pathname.endsWith("/archive") ? (
-          <ArchiveBoard
-            boardId={boardId}
-            tags={tags}
-            onTaskClick={setSelectedTaskId}
-          />
+          <ArchiveBoard boardId={board.id} onTaskClick={setSelectedTaskId} />
         ) : (
           <Board
-            boardId={boardId}
-            tags={tags}
+            boardId={board.id}
             onTaskClick={setSelectedTaskId}
             onTaskCreated={handleTaskCreated}
             filterTasks={filterTasks}
@@ -105,10 +94,24 @@ export const BoardWrapper = () => {
         <TaskModal
           taskId={selectedTaskId}
           tags={tags}
-          boardId={boardId}
+          boardId={board.id}
           onClose={() => setSelectedTaskId(null)}
         />
       )}
     </div>
+  );
+};
+
+export const BoardWrapper = () => {
+  const { boardId } = useParams();
+
+  if (!boardId) {
+    return null;
+  }
+
+  return (
+    <BoardProvider boardId={boardId}>
+      <BoardContent />
+    </BoardProvider>
   );
 };

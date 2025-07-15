@@ -1,5 +1,5 @@
 import React, { useState } from "react";
-import { Task, CellPosition, User, Tag } from "@/types";
+import { Task, CellPosition, Tag, FullTask } from "@/types";
 import { TaskCard } from "./TaskCard";
 import { Plus } from "lucide-react";
 import { useTasks } from "@/api/hooks/useTasks";
@@ -10,15 +10,13 @@ const timeframeLevels = [">3 hours", "> 1 day", "> 1 week"];
 
 interface BoardProps {
   boardId: string;
-  tags: Tag[];
   onTaskClick: (taskId: string) => void;
   onTaskCreated: (taskId: string) => void;
-  filterTasks: (tasks: Task[]) => Task[];
+  filterTasks: (tasks: FullTask[]) => FullTask[];
 }
 
 export function Board({
   boardId,
-  tags,
   onTaskClick,
   onTaskCreated,
   filterTasks,
@@ -180,7 +178,6 @@ export function Board({
                       >
                         <TaskCard
                           taskId={task.id}
-                          tags={tags}
                           boardId={boardId}
                           onClick={() => onTaskClick(task.id)}
                         />

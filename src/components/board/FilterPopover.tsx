@@ -1,6 +1,6 @@
 import { Filter, X, Search } from "lucide-react";
 import { Popover } from "./Popover";
-import type { Task, User, Tag } from "../../types";
+import type { Task, Tag } from "../../types";
 import { TASK_STATUSES } from "../../utils/taskStatus";
 import { useState } from "react";
 
@@ -50,13 +50,6 @@ export function FilterPopover({
   const filteredTags = tags.filter((tag) =>
     tag.name.toLowerCase().includes(searchState.tags.toLowerCase())
   );
-
-  const handleToggleAssignee = (name: string) => {
-    const newAssignees = filters.assignees.includes(name)
-      ? filters.assignees.filter((a) => a !== name)
-      : [...filters.assignees, name];
-    onFilterChange({ ...filters, assignees: newAssignees });
-  };
 
   const handleToggleStatus = (status: Task["status"]) => {
     const newStatuses = filters.statuses.includes(status)

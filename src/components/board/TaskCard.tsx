@@ -1,22 +1,25 @@
 import React from "react";
-import { Task, User as UserType, Tag as TagType, TodoItem, Tag } from "@/types";
+import { Task, TodoItem, FullTask } from "@/types";
 import { useTasks } from "@/api/hooks/useTasks";
 import { getStatusButton } from "@/utils/taskStatus";
 
 interface TaskCardProps {
   taskId: string;
-  tags: TagType[];
   boardId: string;
   onClick: () => void;
 }
 
-export function TaskCard({ taskId, tags, boardId, onClick }: TaskCardProps) {
+export function TaskCard({ taskId, boardId, onClick }: TaskCardProps) {
   const { tasks, updateTask } = useTasks(boardId);
   const task = tasks.find((t) => t.id === taskId);
 
+  if (!task) {
+    return null;
+  }
+
   const handleStatusChange = async (newStatus: Task["status"]) => {
     await updateTask({
-      id: task!.id,
+      id: taskId,
       updates: { status: newStatus },
     });
   };
@@ -25,11 +28,11 @@ export function TaskCard({ taskId, tags, boardId, onClick }: TaskCardProps) {
     return null;
   }
 
-  const todos = task.todos || [];
-  const taskTags = task.tags || [];
+  const todos = task.task_todos || [];
+  const taskTags = task.task_tags || [];
 
   const completedTodos = todos.filter(
-    (todo: TodoItem) => todo.completed
+    (todo: TodoItem) => todo.is_completed
   ).length;
   const totalTodos = todos.length;
   const progress = totalTodos === 0 ? 0 : (completedTodos / totalTodos) * 100;
@@ -45,7 +48,7 @@ export function TaskCard({ taskId, tags, boardId, onClick }: TaskCardProps) {
     completed: "bg-green-50 border-green-200",
   };
 
-  const assignedUser = task.assignee_id;
+  const assignedUsers = task.task_assignees;
 
   return (
     <div
@@ -64,32 +67,34 @@ export function TaskCard({ taskId, tags, boardId, onClick }: TaskCardProps) {
 
       <div className="flex items-start justify-between gap-3 pr-10">
         <h3 className="font-medium text-gray-800 flex-1">{task.title}</h3>
-        {assignedUser && (
+        {assignedUsers.length > 0 && (
           <div className="flex-shrink-0">
-            {assignedUser.avatar ? (
-              <img
-                src={assignedUser.avatar}
-                alt={assignedUser.name}
-                className="w-6 h-6 rounded-full object-cover"
-                title={assignedUser.name}
-              />
-            ) : (
-              <div
-                className="w-6 h-6 rounded-full bg-blue-500 text-white flex items-center justify-center text-sm"
-                title={assignedUser.name}
-              >
-                {assignedUser.name[0].toUpperCase()}
+            {assignedUsers.map((user) => (
+              <div key={user.id} className="flex-shrink-0">
+                {user.avatar_url ? (
+                  <img
+                    src={user.avatar_url}
+                    alt={user.name}
+                    className="w-6 h-6 rounded-full object-cover"
+                    title={user.name}
+                  />
+                ) : (
+                  <div
+                    className="w-6 h-6 rounded-full bg-blue-500 text-white flex items-center justify-center text-sm"
+                    title={user.name}
+                  >
+                    {user.name[0].toUpperCase()}
+                  </div>
+                )}
               </div>
-            )}
+            ))}
           </div>
         )}
       </div>
 
       {taskTags.length > 0 && (
         <div className="flex flex-wrap gap-1 mt-2">
-          {taskTags.map((tagId: string) => {
-            const tag = tags.find((t: Tag) => t.id === tagId);
-            if (!tag) return null;
+          {taskTags.map((tag) => {
             return (
               <span
                 key={tag.id}

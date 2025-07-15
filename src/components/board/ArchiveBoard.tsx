@@ -5,15 +5,10 @@ import { Trash2, Archive } from "lucide-react";
 
 interface ArchiveBoardProps {
   boardId: string;
-  tags: Tag[];
   onTaskClick: (taskId: string) => void;
 }
 
-export function ArchiveBoard({
-  boardId,
-  tags,
-  onTaskClick,
-}: ArchiveBoardProps) {
+export function ArchiveBoard({ boardId, onTaskClick }: ArchiveBoardProps) {
   const { tasks, deleteTask } = useTasks(boardId);
   const archivedTasks = tasks.filter((task) => task.status === "archived");
 
@@ -54,7 +49,6 @@ export function ArchiveBoard({
           <TaskCard
             key={task.id}
             taskId={task.id}
-            tags={tags}
             boardId={boardId}
             onClick={() => onTaskClick(task.id)}
           />

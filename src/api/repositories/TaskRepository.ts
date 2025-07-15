@@ -27,7 +27,7 @@ export class TaskRepository extends BaseRepository<"tasks", Task> {
           tags (*)
         ),
         task_assignees (
-          users (
+          users!task_assignees_user_id_fkey (
             id,
             email,
             name

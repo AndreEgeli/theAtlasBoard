@@ -2,6 +2,7 @@ import React, { useState } from "react";
 import { Tag } from "lucide-react";
 import { useTags } from "@/api/hooks/useTags";
 import type { Tag as TagType } from "@/types";
+import { useAuth } from "@/hooks/useAuth";
 
 const colorOptions = {
   "Light Blue": "#D1E2FF",
@@ -14,6 +15,7 @@ const colorOptions = {
 export function TagManagement() {
   const { tags, createTag, deleteTag, isCreating, isDeleting } = useTags();
   const [newTagName, setNewTagName] = useState("");
+  const { currentOrganization } = useAuth();
   const [newTagColor, setNewTagColor] = useState("#D1E2FF");
 
   const handleAddTag = () => {
@@ -21,6 +23,7 @@ export function TagManagement() {
       createTag({
         name: newTagName.trim(),
         color: newTagColor,
+        organization_id: currentOrganization?.id ?? "",
       });
       setNewTagName("");
     }

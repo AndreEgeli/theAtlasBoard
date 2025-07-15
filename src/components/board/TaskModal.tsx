@@ -1,10 +1,10 @@
 import { useState } from "react";
-import { useTasks } from "@/api/hooks/useTasks";
-import type { Task, Tag as TagType } from "../../types";
-import { Check, Plus, Tag, X } from "lucide-react";
+import { useTask } from "@/api/hooks/useTask";
+import { useBoardContext } from "@/contexts/BoardContext";
+import type { Task, Tag as TagType, FullUser } from "../../types";
+import { Check, Plus, Tag, X, User } from "lucide-react";
 import { Trash2 } from "lucide-react";
 import { getStatusButton } from "@/utils/taskStatus";
-import { useAuth } from "@/hooks/useAuth";
 
 interface TaskModalProps {
   boardId: string;
@@ -14,9 +14,8 @@ interface TaskModalProps {
 }
 
 export function TaskModal({ boardId, taskId, tags, onClose }: TaskModalProps) {
-  const { user } = useAuth();
   const {
-    tasks,
+    task,
     updateTask,
     deleteTask,
     isUpdating,
@@ -26,9 +25,11 @@ export function TaskModal({ boardId, taskId, tags, onClose }: TaskModalProps) {
     deleteTodo,
     addTag,
     removeTag,
-  } = useTasks(boardId);
-  const task = tasks.find((t) => t.id === taskId);
-  const todos = task?.task_todos || [];
+    assignUser,
+    unassignUser,
+  } = useTask(boardId, taskId);
+
+  const { teamMembers } = useBoardContext();
 
   const [title, setTitle] = useState(task?.title || "");
   const [description, setDescription] = useState(task?.description || "");
@@ -38,58 +39,63 @@ export function TaskModal({ boardId, taskId, tags, onClose }: TaskModalProps) {
     return null;
   }
 
-  const taskTags = task?.task_tags || [];
+  const todos = task.task_todos || [];
+  const taskTags = task.task_tags || [];
 
   const handleAddTodo = async () => {
     if (newTodo.trim()) {
       await createTodo({
         title: newTodo.trim(),
         is_completed: false,
-        task_id: task.id,
-        created_by: user?.id,
       });
       setNewTodo("");
     }
   };
 
-  const handleToggleTodo = async (todoId: string, completed: boolean) => {
-    await updateTodo({ id: todoId, updates: { is_completed: !completed } });
+  const handleToggleTodo = async (todoId: string, isCompleted: boolean) => {
+    await updateTodo({ todoId, updates: { is_completed: !isCompleted } });
   };
 
   const handleSave = () => {
     updateTask({
-      id: task.id,
       updates: { title, description },
     });
     onClose();
   };
 
   const handleDelete = async () => {
-    await deleteTask(task.id);
+    await deleteTask();
     onClose();
   };
 
-  const handleAssigneeChange = (assignee: string) => {
-    updateTask({ id: task.id, updates: { assignee } });
-  };
-
   const handleTagSelect = async (tagId: string) => {
-    const isSelected = taskTags.some(
-      (existingTagId) => existingTagId === tagId
-    );
-    console.log(isSelected);
+    const isSelected = taskTags.some((tag) => tag.id === tagId);
+
     if (isSelected) {
       await removeTag(tagId);
     } else {
-      await addTag(tagId);
+      const tag = tags.find((t) => t.id === tagId);
+      if (tag) {
+        await addTag(tag);
+      }
     }
   };
 
   const handleStatusChange = async (newStatus: Task["status"]) => {
     await updateTask({
-      id: task!.id,
       updates: { status: newStatus },
     });
+  };
+
+  const handleAssignUser = async (userId: string) => {
+    const user = teamMembers.find((member) => member.id === userId);
+    if (user) {
+      await assignUser(user);
+    }
+  };
+
+  const handleUnassignUser = async (userId: string) => {
+    await unassignUser(userId);
   };
 
   const completedTodos = todos.filter((todo) => todo.is_completed).length;
@@ -132,7 +138,6 @@ export function TaskModal({ boardId, taskId, tags, onClose }: TaskModalProps) {
               value=""
               onChange={(e) => {
                 if (e.target.value) {
-                  console.log(e.target.value);
                   handleTagSelect(e.target.value);
                   e.target.value = "";
                 }
@@ -141,7 +146,7 @@ export function TaskModal({ boardId, taskId, tags, onClose }: TaskModalProps) {
             >
               <option value="">Select a tag...</option>
               {tags
-                .filter((tag) => !taskTags.includes(tag.id))
+                .filter((tag) => !taskTags.some((tt) => tt.id === tag.id))
                 .map((tag) => (
                   <option key={tag.id} value={tag.id} className="">
                     {tag.name}
@@ -153,28 +158,78 @@ export function TaskModal({ boardId, taskId, tags, onClose }: TaskModalProps) {
 
         {taskTags.length > 0 && (
           <div className="flex flex-wrap gap-2 mb-6">
-            {taskTags.map((tagId) => {
-              const tag = tags.find((t) => t.id === tagId);
-              if (!tag) return null;
-              return (
-                <span
-                  key={tag.id}
-                  className="px-3 py-1 rounded-full flex items-center gap-2"
-                  style={{ backgroundColor: tag.color }}
+            {taskTags.map((tag) => (
+              <span
+                key={tag.id}
+                className="px-3 py-1 rounded-full flex items-center gap-2"
+                style={{ backgroundColor: tag.color }}
+              >
+                <Tag size={14} />
+                {tag.name}
+                <button
+                  onClick={() => handleTagSelect(tag.id)}
+                  className="hover:opacity-75"
                 >
-                  <Tag size={14} />
-                  {tag.name}
+                  ×
+                </button>
+              </span>
+            ))}
+          </div>
+        )}
+
+        <div className="mb-6">
+          <div className="flex items-center gap-4 mb-4">
+            <div className="flex-1">
+              <label className="block text-sm font-medium text-gray-700 mb-1">
+                Assign user
+              </label>
+              <select
+                value=""
+                onChange={(e) => {
+                  if (e.target.value) {
+                    handleAssignUser(e.target.value);
+                    e.target.value = "";
+                  }
+                }}
+                className="w-full px-2 py-1 border rounded"
+              >
+                <option value="">Select a user...</option>
+                {teamMembers
+                  .filter(
+                    (member) =>
+                      !task.task_assignees.some(
+                        (assignee) => assignee.id === member.id
+                      )
+                  )
+                  .map((member) => (
+                    <option key={member.id} value={member.id}>
+                      {member.name} ({member.email})
+                    </option>
+                  ))}
+              </select>
+            </div>
+          </div>
+
+          {task.task_assignees.length > 0 && (
+            <div className="flex flex-wrap gap-2">
+              {task.task_assignees.map((assignee) => (
+                <div
+                  key={assignee.id}
+                  className="px-3 py-1 bg-blue-100 rounded-full flex items-center gap-2"
+                >
+                  <User size={14} />
+                  <span className="text-sm">{assignee.name}</span>
                   <button
-                    onClick={() => handleTagSelect(tag.id)}
-                    className="hover:opacity-75"
+                    onClick={() => handleUnassignUser(assignee.id)}
+                    className="hover:opacity-75 text-red-500"
                   >
                     ×
                   </button>
-                </span>
-              );
-            })}
-          </div>
-        )}
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
 
         <div className="mb-6">
           <label className="block text-sm font-medium text-gray-700 mb-2">
@@ -212,25 +267,34 @@ export function TaskModal({ boardId, taskId, tags, onClose }: TaskModalProps) {
             {todos.map((todo) => (
               <div
                 key={todo.id}
-                className="flex items-center gap-2 p-2 hover:bg-gray-50 rounded"
+                className="flex items-center gap-2 p-2 hover:bg-gray-50 rounded group"
               >
                 <button
-                  onClick={() => handleToggleTodo(todo.id, todo.completed)}
+                  onClick={() =>
+                    handleToggleTodo(todo.id, todo.is_completed ?? false)
+                  }
                   className={`w-5 h-5 rounded border flex items-center justify-center ${
-                    todo.completed
+                    todo.is_completed
                       ? "bg-blue-500 border-blue-500 text-white"
                       : "border-gray-300"
                   }`}
                 >
-                  {todo.completed && <Check size={14} />}
+                  {todo.is_completed && <Check size={14} />}
                 </button>
                 <span
                   className={`flex-1 ${
-                    todo.completed ? "line-through text-gray-400" : ""
+                    todo.is_completed ? "line-through text-gray-400" : ""
                   }`}
                 >
-                  {todo.text}
+                  {todo.title}
                 </span>
+                <button
+                  onClick={() => deleteTodo(todo.id)}
+                  className="opacity-0 group-hover:opacity-100 text-red-500 hover:text-red-600 p-1"
+                  title="Delete todo"
+                >
+                  <X size={16} />
+                </button>
               </div>
             ))}
           </div>

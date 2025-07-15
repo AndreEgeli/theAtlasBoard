@@ -470,7 +470,7 @@ CREATE POLICY "Organization members can view tags" ON tags
   );
 
 CREATE POLICY "Organization members can create tags" ON tags
-  FOR INSERT USING (
+  FOR INSERT WITH CHECK (
     is_organization_member(organization_id)
   );
 
