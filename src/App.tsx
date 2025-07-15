@@ -8,7 +8,9 @@ import { OrganizationSettings } from "./components/organization/OrganizationSett
 import { UserProfile } from "./components/profile/UserProfile";
 import { PostSignupFlow } from "./pages/PostSignup";
 import LoginPage from "./pages/LoginPage";
+import { MyTasksPage } from "./pages/MyTasksPage";
 import { useAuth } from "./hooks/useAuth";
+import { ToastProvider } from "./components/ui/toast";
 
 export const queryClient = new QueryClient({
   defaultOptions: {
@@ -43,42 +45,45 @@ function ProtectedRoute({ children }: { children: React.ReactNode }) {
 export default function App() {
   return (
     <QueryClientProvider client={queryClient}>
-      <BrowserRouter>
-        <Routes>
-          <Route path="/login" element={<LoginPage />} />
-          <Route
-            path="/post-signup"
-            element={
-              <ProtectedRoute>
-                <PostSignupFlow />
-              </ProtectedRoute>
-            }
-          />
-          <Route
-            path="/board/:boardId/*"
-            element={
-              <ProtectedRoute>
-                <BoardWrapper />
-              </ProtectedRoute>
-            }
-          />
-          <Route
-            element={
-              <ProtectedRoute>
-                <AppLayout />
-              </ProtectedRoute>
-            }
-          >
-            <Route index element={<BoardIndex />} />
-            <Route path="organization">
-              <Route index element={<OrganizationSettings />} />
-              <Route path="teams" element={<TeamManagement />} />
+      <ToastProvider>
+        <BrowserRouter>
+          <Routes>
+            <Route path="/login" element={<LoginPage />} />
+            <Route
+              path="/post-signup"
+              element={
+                <ProtectedRoute>
+                  <PostSignupFlow />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/board/:boardId/*"
+              element={
+                <ProtectedRoute>
+                  <BoardWrapper />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              element={
+                <ProtectedRoute>
+                  <AppLayout />
+                </ProtectedRoute>
+              }
+            >
+              <Route index element={<BoardIndex />} />
+              <Route path="my-tasks" element={<MyTasksPage />} />
+              <Route path="organization">
+                <Route index element={<OrganizationSettings />} />
+                <Route path="teams" element={<TeamManagement />} />
+              </Route>
+              <Route path="settings" element={<UserProfile />} />
             </Route>
-            <Route path="settings" element={<UserProfile />} />
-          </Route>
-          <Route path="*" element={<Navigate to="/" replace />} />
-        </Routes>
-      </BrowserRouter>
+            <Route path="*" element={<Navigate to="/" replace />} />
+          </Routes>
+        </BrowserRouter>
+      </ToastProvider>
     </QueryClientProvider>
   );
 }

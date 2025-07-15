@@ -8,6 +8,7 @@ import {
   ChevronLeft,
   ChevronRight,
   Building2,
+  CheckSquare,
 } from "lucide-react";
 
 export function AppLayout() {
@@ -22,6 +23,12 @@ export function AppLayout() {
 
   const navItems = [
     { icon: LayoutGrid, label: "Boards", path: "/" },
+    {
+      icon: CheckSquare,
+      label: "My Tasks",
+      path: "/my-tasks",
+      isActive: location.pathname === "/my-tasks",
+    },
     {
       icon: Building2,
       label: "Organization",

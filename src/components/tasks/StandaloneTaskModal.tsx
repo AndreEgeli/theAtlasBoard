@@ -1,22 +1,30 @@
 import { useState, useEffect } from "react";
 import { useTask } from "@/api/hooks/useTask";
-import { useBoardContext } from "@/contexts/BoardContext";
 import { useAuth } from "@/hooks/useAuth";
 import { TeamMemberRepository } from "@/api/repositories/TeamMemberRepository";
 import { supabase } from "@/lib/supabase";
-import type { Task, Tag as TagType, TeamPermissions } from "../../types";
+import type { Task, Tag as TagType, TeamPermissions, FullUser } from "@/types";
 import { Check, Plus, Tag, X, User, Lock } from "lucide-react";
 import { Trash2 } from "lucide-react";
 import { getStatusButton } from "@/utils/taskStatus";
 
-interface TaskModalProps {
+interface StandaloneTaskModalProps {
   boardId: string;
   taskId: string;
   tags: TagType[];
   onClose: () => void;
 }
 
-export function TaskModal({ boardId, taskId, tags, onClose }: TaskModalProps) {
+/**
+ * Standalone version of TaskModal that doesn't require BoardContext
+ * Used for My Tasks page where we don't have board context
+ */
+export function StandaloneTaskModal({
+  boardId,
+  taskId,
+  tags,
+  onClose,
+}: StandaloneTaskModalProps) {
   const {
     task,
     updateTask,
@@ -32,7 +40,6 @@ export function TaskModal({ boardId, taskId, tags, onClose }: TaskModalProps) {
     unassignUser,
   } = useTask(boardId, taskId);
 
-  const { teamMembers } = useBoardContext();
   const { user } = useAuth();
 
   const [title, setTitle] = useState(task?.title || "");
@@ -40,29 +47,45 @@ export function TaskModal({ boardId, taskId, tags, onClose }: TaskModalProps) {
   const [newTodo, setNewTodo] = useState("");
   const [permissions, setPermissions] = useState<TeamPermissions | null>(null);
   const [permissionsLoading, setPermissionsLoading] = useState(true);
+  const [teamMembers, setTeamMembers] = useState<FullUser[]>([]);
+  const [teamMembersLoading, setTeamMembersLoading] = useState(true);
 
-  // Load user permissions for this board
+  // Load user permissions and team members for this board
   useEffect(() => {
-    const loadPermissions = async () => {
+    const loadBoardData = async () => {
       if (!user?.id || !boardId) return;
 
       try {
         const repository = new TeamMemberRepository(supabase);
-        const boardAccess = await repository.getUserBoardPermissions(
-          user.id,
-          boardId
-        );
+
+        // Load permissions and team members in parallel
+        const [boardAccess, members] = await Promise.all([
+          repository.getUserBoardPermissions(user.id, boardId),
+          repository.getBoardTeamMembers(boardId),
+        ]);
+
         setPermissions(boardAccess?.permissions || null);
+        setTeamMembers(members);
       } catch (error) {
-        console.error("Failed to load permissions:", error);
+        console.error("Failed to load board data:", error);
         setPermissions(null);
+        setTeamMembers([]);
       } finally {
         setPermissionsLoading(false);
+        setTeamMembersLoading(false);
       }
     };
 
-    loadPermissions();
+    loadBoardData();
   }, [user?.id, boardId]);
+
+  // Update local state when task changes
+  useEffect(() => {
+    if (task) {
+      setTitle(task.title || "");
+      setDescription(task.description || "");
+    }
+  }, [task]);
 
   if (!task) {
     return null;
@@ -117,9 +140,9 @@ export function TaskModal({ boardId, taskId, tags, onClose }: TaskModalProps) {
   };
 
   const handleAssignUser = async (userId: string) => {
-    const user = teamMembers.find((member) => member.id === userId);
-    if (user) {
-      await assignUser(user);
+    const member = teamMembers.find((member) => member.id === userId);
+    if (member) {
+      await assignUser(member);
     }
   };
 
@@ -143,14 +166,14 @@ export function TaskModal({ boardId, taskId, tags, onClose }: TaskModalProps) {
   const canToggleTodos = permissions?.canToggleTodos ?? false;
   const isViewer = !canEditTasks && !canDeleteTasks;
 
-  // Show loading state for permissions
-  if (permissionsLoading) {
+  // Show loading state for permissions or team members
+  if (permissionsLoading || teamMembersLoading) {
     return (
       <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
         <div className="bg-white rounded-lg w-full max-w-2xl mx-4 p-6">
           <div className="flex items-center justify-center py-8">
             <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
-            <span className="ml-3 text-gray-600">Loading permissions...</span>
+            <span className="ml-3 text-gray-600">Loading task details...</span>
           </div>
         </div>
       </div>

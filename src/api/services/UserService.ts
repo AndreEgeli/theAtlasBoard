@@ -1,5 +1,4 @@
 import { supabase } from "@/lib/supabase";
-import { User } from "@/types/index";
 
 export class UserService {
   async updateProfile({

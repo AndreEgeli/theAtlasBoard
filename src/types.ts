@@ -17,6 +17,7 @@ export type CellPosition = {
 
 export type TeamRole = Database["public"]["Enums"]["team_role"];
 export type OrgRole = Database["public"]["Enums"]["org_role"];
+export type TaskStatus = Database["public"]["Enums"]["task_status"];
 
 export type Organization = Database["public"]["Tables"]["organizations"]["Row"];
 export type OrganizationInsert =
@@ -70,6 +71,43 @@ export type FullTask = Task & {
   task_assignees: Array<FullUser>;
 };
 
+/**
+ * Task with additional context information about its team and board
+ */
+export type TaskWithContext = FullTask & {
+  boardId: string;
+  boardName: string;
+  teamId: string;
+  teamName: string;
+  userPermissions: TeamPermissions;
+};
+
+/**
+ * Filters for task queries
+ */
+export interface TaskFilters {
+  status?: TaskStatus[];
+  teamIds?: string[];
+  boardIds?: string[];
+  dueDateRange?: DateRange;
+}
+
+/**
+ * Date range for filtering
+ */
+export interface DateRange {
+  start?: string;
+  end?: string;
+}
+
+/**
+ * Sorting options for tasks
+ */
+export interface TaskSorting {
+  field: "dueDate" | "createdAt" | "updatedAt" | "priority";
+  direction: "asc" | "desc";
+}
+
 export type TaskPosition = {
   x_index: number;
   y_index: number;
@@ -102,3 +140,73 @@ export type BoardUpdate = Database["public"]["Tables"]["boards"]["Update"];
 export type FullBoard = Board & {
   board_tasks: Array<FullTask>;
 };
+
+/**
+ * Defines all possible permissions that can be granted to a user
+ * based on their role within a team.
+ */
+export interface TeamPermissions {
+  // Board permissions
+  canCreateBoards: boolean;
+  canEditBoards: boolean;
+  canDeleteBoards: boolean;
+  canViewBoards: boolean;
+
+  // Task permissions
+  canCreateTasks: boolean;
+  canEditTasks: boolean;
+  canDeleteTasks: boolean;
+  canAssignTasks: boolean;
+  canViewTasks: boolean;
+
+  // Todo permissions
+  canCreateTodos: boolean;
+  canEditTodos: boolean;
+  canDeleteTodos: boolean;
+  canToggleTodos: boolean;
+  canViewTodos: boolean;
+
+  // Tag permissions
+  canAddTaskTags: boolean;
+  canRemoveTaskTags: boolean;
+}
+
+/**
+ * Extended team member model that includes calculated permissions
+ */
+export interface TeamMemberWithPermissions {
+  userId: string;
+  teamId: string;
+  role: TeamRole;
+  permissions: TeamPermissions;
+}
+
+/**
+ * Board access model that includes role and permissions information
+ */
+export interface BoardAccess {
+  boardId: string;
+  userId: string;
+  teamId: string;
+  role: TeamRole;
+  permissions: TeamPermissions;
+  canEdit: boolean;
+  canView: boolean;
+}
+
+/**
+ * Custom error class for permission-related errors
+ */
+export class PermissionError extends Error {
+  constructor(
+    public action: string,
+    public resource: string,
+    public requiredRole: TeamRole,
+    public userRole: TeamRole | null
+  ) {
+    super(
+      `Insufficient permissions: ${action} on ${resource} requires ${requiredRole}, user has ${userRole}`
+    );
+    this.name = "PermissionError";
+  }
+}

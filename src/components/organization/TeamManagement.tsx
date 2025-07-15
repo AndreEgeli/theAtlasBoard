@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Plus, Users } from "lucide-react";
 import {
   useOrganizationTeams,
@@ -6,11 +6,16 @@ import {
   useCreateTeam,
   useInviteMember,
 } from "@/api/hooks/useOrganization";
-import { Team } from "../../types";
+import { Team, TeamRole } from "../../types";
 import { useAuth } from "@/hooks/useAuth";
+import { RoleManagement } from "./RoleManagement";
+import { RoleHelpText } from "./RoleHelpText";
+import { usePermissions } from "@/hooks/permissions/usePermissions";
+import { TeamMemberRepository } from "@/api/repositories/TeamMemberRepository";
+import { supabase } from "@/lib/supabase";
 
 export function TeamManagement() {
-  const { currentOrganization } = useAuth();
+  const { currentOrganization, user } = useAuth();
   const { data: teams = [] } = useOrganizationTeams();
   const { data: members = [] } = useOrganizationMembers();
   const { mutate: createTeam, isPending: isCreatingTeam } = useCreateTeam();
@@ -20,6 +25,37 @@ export function TeamManagement() {
   const [selectedTeam, setSelectedTeam] = useState<Team | null>(null);
   const [newTeamName, setNewTeamName] = useState("");
   const [inviteEmail, setInviteEmail] = useState("");
+  const [teamMembers, setTeamMembers] = useState<any[]>([]);
+  const [loadingMembers, setLoadingMembers] = useState(false);
+
+  // Get current user's permissions for the selected team
+  const { permissions: userPermissions } = usePermissions(
+    selectedTeam?.id || ""
+  );
+
+  // Fetch team members when a team is selected
+  useEffect(() => {
+    const fetchTeamMembers = async () => {
+      if (!selectedTeam || selectedTeam.is_org_wide) {
+        setTeamMembers([]);
+        return;
+      }
+
+      setLoadingMembers(true);
+      try {
+        const teamMemberRepo = new TeamMemberRepository(supabase);
+        const membersData = await teamMemberRepo.findByTeam(selectedTeam.id);
+        setTeamMembers(membersData || []);
+      } catch (error) {
+        console.error("Error fetching team members:", error);
+        setTeamMembers([]);
+      } finally {
+        setLoadingMembers(false);
+      }
+    };
+
+    fetchTeamMembers();
+  }, [selectedTeam]);
 
   if (!currentOrganization) return null;
 
@@ -97,9 +133,12 @@ export function TeamManagement() {
           {selectedTeam ? (
             <>
               <div className="flex items-center justify-between">
-                <h3 className="text-lg font-medium">
-                  {selectedTeam.name} Members
-                </h3>
+                <div className="flex items-center gap-4">
+                  <h3 className="text-lg font-medium">
+                    {selectedTeam.name} Members
+                  </h3>
+                  <RoleHelpText />
+                </div>
                 {!selectedTeam.is_org_wide && (
                   <div className="flex gap-2">
                     <input
@@ -120,13 +159,13 @@ export function TeamManagement() {
               </div>
 
               <div className="space-y-2">
-                {members
-                  .filter((member) => {
-                    if (selectedTeam.is_org_wide) return true;
-                    // TODO: Add team_members filtering once implemented
-                    return true;
-                  })
-                  .map((member) => (
+                {loadingMembers ? (
+                  <div className="flex items-center justify-center py-8 text-gray-500">
+                    Loading team members...
+                  </div>
+                ) : selectedTeam.is_org_wide ? (
+                  // Show organization members for org-wide teams
+                  members.map((member) => (
                     <div
                       key={member.user_id}
                       className="flex items-center justify-between p-4 bg-gray-50 rounded"
@@ -148,7 +187,68 @@ export function TeamManagement() {
                         {member.role}
                       </span>
                     </div>
-                  ))}
+                  ))
+                ) : (
+                  // Show team-specific members with role management
+                  teamMembers.map((member) => {
+                    const canManageRoles =
+                      userPermissions?.canEditBoards || false;
+                    const isCurrentUser = member.user_id === user?.id;
+
+                    return (
+                      <div
+                        key={member.user_id}
+                        className="flex items-center justify-between p-4 bg-gray-50 rounded"
+                      >
+                        <div className="flex items-center gap-3">
+                          <Users size={20} className="text-gray-500" />
+                          <div>
+                            <div className="font-medium">
+                              {member.users?.name ||
+                                member.users?.email ||
+                                "Unknown User"}
+                              {isCurrentUser && (
+                                <span className="ml-2 text-xs bg-blue-100 text-blue-700 px-2 py-0.5 rounded-full">
+                                  You
+                                </span>
+                              )}
+                            </div>
+                            <div className="text-sm text-gray-500">
+                              {member.users?.email}
+                            </div>
+                          </div>
+                        </div>
+
+                        <RoleManagement
+                          teamId={selectedTeam.id}
+                          userId={member.user_id}
+                          currentRole={member.role as TeamRole}
+                          userName={member.users?.name || ""}
+                          userEmail={member.users?.email || ""}
+                          canManageRoles={canManageRoles && !isCurrentUser}
+                          onRoleChange={(newRole) => {
+                            // Update the local state to reflect the change
+                            setTeamMembers((prev) =>
+                              prev.map((m) =>
+                                m.user_id === member.user_id
+                                  ? { ...m, role: newRole }
+                                  : m
+                              )
+                            );
+                          }}
+                        />
+                      </div>
+                    );
+                  })
+                )}
+
+                {!loadingMembers &&
+                  !selectedTeam.is_org_wide &&
+                  teamMembers.length === 0 && (
+                    <div className="flex items-center justify-center py-8 text-gray-500">
+                      No team members yet. Invite someone to get started!
+                    </div>
+                  )}
               </div>
             </>
           ) : (
