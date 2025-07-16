@@ -209,10 +209,26 @@ export class UserTaskRepository extends BaseRepository<"tasks", Task> {
       const userPermissions = teamPermissions.get(team.id)!;
 
       return {
-        ...task,
+        // Core task fields
+        id: task.id,
+        title: task.title,
+        description: task.description,
+        status: task.status,
+        deadline_at: task.deadline_at,
+        created_at: task.created_at,
+        updated_at: task.updated_at,
+        board_id: task.board_id,
+        created_by: task.created_by,
+        order: task.order,
+        x_index: task.x_index,
+        y_index: task.y_index,
+
+        // Related data
         task_todos: task.todos || [],
         task_tags: task.task_tags?.map((tt: any) => tt.tags) || [],
         task_assignees: task.task_assignees?.map((ta: any) => ta.users) || [],
+
+        // Context fields
         boardId: board.id,
         boardName: board.name,
         teamId: team.id,

@@ -1,8 +1,6 @@
-import { useState, useEffect } from "react";
+import { useState, useMemo } from "react";
 import { TaskWithContext, TaskFilters, TaskSorting, TaskStatus } from "@/types";
-import { UserTaskRepository } from "@/api/repositories/UserTaskRepository";
-import { supabase } from "@/lib/supabase";
-import { useAuth } from "@/hooks/useAuth";
+import { useUserTasks } from "@/hooks/useUserTasks";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -35,12 +33,6 @@ export function UserTaskView({
   onTaskClick,
   onTaskStatusUpdate,
 }: UserTaskViewProps) {
-  const { user } = useAuth();
-  const [tasks, setTasks] = useState<TaskWithContext[]>([]);
-  const [filteredTasks, setFilteredTasks] = useState<TaskWithContext[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
-
   // Filter and sorting state
   const [searchQuery, setSearchQuery] = useState("");
   const [statusFilter, setStatusFilter] = useState<TaskStatus[]>([]);
@@ -53,83 +45,52 @@ export function UserTaskView({
     direction: "asc",
   });
 
-  // Available filter options
-  const [availableTeams, setAvailableTeams] = useState<
-    { id: string; name: string }[]
-  >([]);
-  const [availableBoards, setAvailableBoards] = useState<
-    { id: string; name: string; teamId: string }[]
-  >([]);
+  // Build filters for React Query
+  const filters: TaskFilters = useMemo(
+    () => ({
+      status: statusFilter.length > 0 ? statusFilter : undefined,
+      teamIds: teamFilter.length > 0 ? teamFilter : undefined,
+      boardIds: boardFilter.length > 0 ? boardFilter : undefined,
+      dueDateRange:
+        dueDateStart || dueDateEnd
+          ? {
+              start: dueDateStart || undefined,
+              end: dueDateEnd || undefined,
+            }
+          : undefined,
+    }),
+    [statusFilter, teamFilter, boardFilter, dueDateStart, dueDateEnd]
+  );
 
-  const repository = new UserTaskRepository(supabase);
+  // Use React Query hook for data fetching
+  const {
+    tasks,
+    loading,
+    error,
+    updateTaskStatus,
+    getTeamsWithTasks,
+    getBoardsWithTasks,
+    isUpdatingStatus,
+  } = useUserTasks(filters, sorting);
 
-  // Load tasks and filter options
-  useEffect(() => {
-    if (!user?.id) return;
+  // Get available filter options
+  const availableTeams = getTeamsWithTasks();
+  const availableBoards = getBoardsWithTasks();
 
-    const loadData = async () => {
-      try {
-        setLoading(true);
-        setError(null);
-
-        // Load tasks with current filters
-        const filters: TaskFilters = {
-          status: statusFilter.length > 0 ? statusFilter : undefined,
-          teamIds: teamFilter.length > 0 ? teamFilter : undefined,
-          boardIds: boardFilter.length > 0 ? boardFilter : undefined,
-          dueDateRange:
-            dueDateStart || dueDateEnd
-              ? {
-                  start: dueDateStart || undefined,
-                  end: dueDateEnd || undefined,
-                }
-              : undefined,
-        };
-
-        const [tasksData, teamsData, boardsData] = await Promise.all([
-          repository.findAssignedTasks(user.id, filters, sorting),
-          repository.getTeamsWithAssignedTasks(user.id),
-          repository.getBoardsWithAssignedTasks(user.id),
-        ]);
-
-        setTasks(tasksData);
-        setAvailableTeams(teamsData);
-        setAvailableBoards(boardsData);
-      } catch (err) {
-        setError(err instanceof Error ? err.message : "Failed to load tasks");
-      } finally {
-        setLoading(false);
-      }
-    };
-
-    loadData();
-  }, [
-    user?.id,
-    statusFilter,
-    teamFilter,
-    boardFilter,
-    dueDateStart,
-    dueDateEnd,
-    sorting,
-  ]);
-
-  // Apply search filter
-  useEffect(() => {
+  // Apply search filter using useMemo for performance
+  const filteredTasks = useMemo(() => {
     if (!searchQuery.trim()) {
-      setFilteredTasks(tasks);
-      return;
+      return tasks;
     }
 
     const query = searchQuery.toLowerCase();
-    const filtered = tasks.filter(
+    return tasks.filter(
       (task) =>
         task.title.toLowerCase().includes(query) ||
         task.description?.toLowerCase().includes(query) ||
         task.boardName.toLowerCase().includes(query) ||
         task.teamName.toLowerCase().includes(query)
     );
-
-    setFilteredTasks(filtered);
   }, [tasks, searchQuery]);
 
   // Handle task status update
@@ -137,21 +98,11 @@ export function UserTaskView({
     task: TaskWithContext,
     newStatus: TaskStatus
   ) => {
-    if (!user?.id) return;
-
     try {
-      await repository.updateTaskStatus(task.id, user.id, newStatus);
-
-      // Update local state
-      setTasks((prev) =>
-        prev.map((t) => (t.id === task.id ? { ...t, status: newStatus } : t))
-      );
-
+      await updateTaskStatus(task.id, newStatus);
       onTaskStatusUpdate?.(task.id, newStatus);
     } catch (err) {
-      setError(
-        err instanceof Error ? err.message : "Failed to update task status"
-      );
+      console.error("Failed to update task status:", err);
     }
   };
 

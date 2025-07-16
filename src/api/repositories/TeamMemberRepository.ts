@@ -38,7 +38,7 @@ export class TeamMemberRepository extends BaseRepository<
       .select(
         `
         *,
-        users (
+        users!team_members_user_id_fkey (
           id,
           email,
           name
@@ -297,7 +297,7 @@ export class TeamMemberRepository extends BaseRepository<
       .select(
         `
         *,
-        users (
+        users!team_members_user_id_fkey (
           id,
           email,
           name,
@@ -311,10 +311,10 @@ export class TeamMemberRepository extends BaseRepository<
 
     // Transform the data to match FullUser type
     return data.map((member) => ({
-      id: member.users.id,
-      email: member.users.email,
-      name: member.users.name,
-      avatar_url: member.users.avatar_url,
+      id: member.users!.id,
+      email: member.users!.email,
+      name: member.users!.name,
+      avatar_url: member.users!.avatar_url,
       active_organization_id: "", // This would need to be fetched separately if needed
     }));
   }

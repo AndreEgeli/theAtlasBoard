@@ -1,5 +1,6 @@
-import { useState, useEffect } from "react";
+import { useState } from "react";
 import { Plus, Users } from "lucide-react";
+import { useQuery } from "@tanstack/react-query";
 import {
   useOrganizationTeams,
   useOrganizationMembers,
@@ -10,9 +11,12 @@ import { Team, TeamRole } from "../../types";
 import { useAuth } from "@/hooks/useAuth";
 import { RoleManagement } from "./RoleManagement";
 import { RoleHelpText } from "./RoleHelpText";
-import { usePermissions } from "@/hooks/permissions/usePermissions";
+import { useTeamPermissions } from "@/hooks/permissions/usePermissions";
 import { TeamMemberRepository } from "@/api/repositories/TeamMemberRepository";
 import { supabase } from "@/lib/supabase";
+
+// Create repository instance
+const teamMemberRepository = new TeamMemberRepository(supabase);
 
 export function TeamManagement() {
   const { currentOrganization, user } = useAuth();
@@ -25,37 +29,16 @@ export function TeamManagement() {
   const [selectedTeam, setSelectedTeam] = useState<Team | null>(null);
   const [newTeamName, setNewTeamName] = useState("");
   const [inviteEmail, setInviteEmail] = useState("");
-  const [teamMembers, setTeamMembers] = useState<any[]>([]);
-  const [loadingMembers, setLoadingMembers] = useState(false);
 
   // Get current user's permissions for the selected team
-  const { permissions: userPermissions } = usePermissions(
-    selectedTeam?.id || ""
-  );
+  const { permissions: userPermissions } = useTeamPermissions(selectedTeam?.id);
 
-  // Fetch team members when a team is selected
-  useEffect(() => {
-    const fetchTeamMembers = async () => {
-      if (!selectedTeam || selectedTeam.is_org_wide) {
-        setTeamMembers([]);
-        return;
-      }
-
-      setLoadingMembers(true);
-      try {
-        const teamMemberRepo = new TeamMemberRepository(supabase);
-        const membersData = await teamMemberRepo.findByTeam(selectedTeam.id);
-        setTeamMembers(membersData || []);
-      } catch (error) {
-        console.error("Error fetching team members:", error);
-        setTeamMembers([]);
-      } finally {
-        setLoadingMembers(false);
-      }
-    };
-
-    fetchTeamMembers();
-  }, [selectedTeam]);
+  // Fetch team members using React Query
+  const { data: teamMembers = [], isLoading: loadingMembers } = useQuery({
+    queryKey: ["teamMembers", selectedTeam?.id],
+    queryFn: () => teamMemberRepository.findByTeam(selectedTeam!.id),
+    enabled: !!selectedTeam && !selectedTeam.is_org_wide,
+  });
 
   if (!currentOrganization) return null;
 
@@ -226,15 +209,9 @@ export function TeamManagement() {
                           userName={member.users?.name || ""}
                           userEmail={member.users?.email || ""}
                           canManageRoles={canManageRoles && !isCurrentUser}
-                          onRoleChange={(newRole) => {
-                            // Update the local state to reflect the change
-                            setTeamMembers((prev) =>
-                              prev.map((m) =>
-                                m.user_id === member.user_id
-                                  ? { ...m, role: newRole }
-                                  : m
-                              )
-                            );
+                          onRoleChange={() => {
+                            // React Query will automatically refetch when the mutation succeeds
+                            // No need for manual state updates
                           }}
                         />
                       </div>

@@ -1,91 +1,107 @@
-import { useState, useEffect } from "react";
-import { TaskWithContext, TaskFilters, TaskSorting } from "@/types";
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import { TaskWithContext, TaskFilters, TaskSorting, TaskStatus } from "@/types";
 import { UserTaskRepository } from "@/api/repositories/UserTaskRepository";
 import { supabase } from "@/lib/supabase";
 import { useAuth } from "./useAuth";
 
+// Create repository instance
+const userTaskRepository = new UserTaskRepository(supabase);
+
 /**
- * Hook for managing user tasks across teams and boards
+ * Hook for managing user tasks across teams and boards using React Query
  */
 export function useUserTasks(filters?: TaskFilters, sorting?: TaskSorting) {
   const { user } = useAuth();
-  const [tasks, setTasks] = useState<TaskWithContext[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
+  const queryClient = useQueryClient();
 
-  const repository = new UserTaskRepository(supabase);
+  // Main query for user tasks
+  const {
+    data: tasks = [],
+    isLoading: loading,
+    error,
+    refetch: loadTasks,
+  } = useQuery({
+    queryKey: ["userTasks", user?.id, filters, sorting],
+    queryFn: () =>
+      userTaskRepository.findAssignedTasks(user!.id, filters, sorting),
+    enabled: !!user?.id,
+  });
 
-  const loadTasks = async () => {
-    if (!user?.id) {
-      setTasks([]);
-      setLoading(false);
-      return;
-    }
+  // Query for teams with tasks
+  const { data: teamsWithTasks = [] } = useQuery({
+    queryKey: ["userTaskTeams", user?.id],
+    queryFn: () => userTaskRepository.getTeamsWithAssignedTasks(user!.id),
+    enabled: !!user?.id,
+  });
 
-    try {
-      setLoading(true);
-      setError(null);
+  // Query for boards with tasks
+  const getBoardsWithTasksQuery = (teamId?: string) =>
+    useQuery({
+      queryKey: ["userTaskBoards", user?.id, teamId],
+      queryFn: () =>
+        userTaskRepository.getBoardsWithAssignedTasks(user!.id, teamId),
+      enabled: !!user?.id,
+    });
 
-      const tasksData = await repository.findAssignedTasks(
-        user.id,
-        filters,
-        sorting
+  // Query for task count
+  const getTaskCountQuery = (countFilters?: TaskFilters) =>
+    useQuery({
+      queryKey: ["userTaskCount", user?.id, countFilters],
+      queryFn: () =>
+        userTaskRepository.countAssignedTasks(user!.id, countFilters),
+      enabled: !!user?.id,
+    });
+
+  // Mutation for updating task status
+  const updateTaskStatusMutation = useMutation({
+    mutationFn: ({ taskId, status }: { taskId: string; status: TaskStatus }) =>
+      userTaskRepository.updateTaskStatus(taskId, user!.id, status),
+    onSuccess: (_, { taskId, status }) => {
+      // Invalidate and refetch user tasks
+      queryClient.invalidateQueries({ queryKey: ["userTasks", user?.id] });
+
+      // Optimistically update the cache
+      queryClient.setQueryData(
+        ["userTasks", user?.id, filters, sorting],
+        (oldTasks: TaskWithContext[] | undefined) =>
+          oldTasks?.map((task) =>
+            task.id === taskId ? { ...task, status } : task
+          ) || []
       );
-      setTasks(tasksData);
-    } catch (err) {
-      setError(err instanceof Error ? err.message : "Failed to load tasks");
-    } finally {
-      setLoading(false);
-    }
+    },
+    onError: (error) => {
+      console.error("Failed to update task status:", error);
+    },
+  });
+
+  const updateTaskStatus = (taskId: string, status: TaskStatus) => {
+    return updateTaskStatusMutation.mutateAsync({ taskId, status });
   };
 
-  useEffect(() => {
-    loadTasks();
-  }, [user?.id, filters, sorting]);
+  // Helper functions that return query results
+  const getTeamsWithTasks = () => teamsWithTasks;
 
-  const updateTaskStatus = async (taskId: string, status: string) => {
-    if (!user?.id) return;
-
-    try {
-      await repository.updateTaskStatus(taskId, user.id, status);
-
-      // Update local state
-      setTasks((prev) =>
-        prev.map((task) =>
-          task.id === taskId ? { ...task, status: status as any } : task
-        )
-      );
-    } catch (err) {
-      setError(
-        err instanceof Error ? err.message : "Failed to update task status"
-      );
-      throw err;
-    }
+  const getBoardsWithTasks = (teamId?: string) => {
+    const query = getBoardsWithTasksQuery(teamId);
+    return query.data || [];
   };
 
-  const getTeamsWithTasks = async () => {
-    if (!user?.id) return [];
-    return repository.getTeamsWithAssignedTasks(user.id);
-  };
-
-  const getBoardsWithTasks = async (teamId?: string) => {
-    if (!user?.id) return [];
-    return repository.getBoardsWithAssignedTasks(user.id, teamId);
-  };
-
-  const countTasks = async (filters?: TaskFilters) => {
-    if (!user?.id) return 0;
-    return repository.countAssignedTasks(user.id, filters);
+  const countTasks = (countFilters?: TaskFilters) => {
+    const query = getTaskCountQuery(countFilters);
+    return query.data || 0;
   };
 
   return {
     tasks,
     loading,
-    error,
+    error: error?.message || null,
     loadTasks,
     updateTaskStatus,
     getTeamsWithTasks,
     getBoardsWithTasks,
     countTasks,
+    // Expose additional React Query states
+    isUpdatingStatus: updateTaskStatusMutation.isPending,
+    updateError: updateTaskStatusMutation.error?.message || null,
   };
 }
