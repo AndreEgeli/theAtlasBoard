@@ -1,26 +1,32 @@
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import { useAuth } from "@/hooks/useAuth";
-import {
-  Card,
-  CardHeader,
-  CardContent,
-} from "@/components/ui/card";
+import { useNavigate } from "react-router-dom";
+import { Card, CardHeader, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Building2, Users, Loader2 } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 export function PostSignupFlow() {
-  const { 
-    pendingInvites, 
-    acceptInvite, 
-    createOrganization, 
-    isCreatingOrg, 
+  const navigate = useNavigate();
+  const {
+    pendingInvites,
+    acceptInvite,
+    createOrganization,
+    isCreatingOrg,
     isAcceptingInvite,
-    isLoading
+    isLoading,
+    hasValidOrg,
   } = useAuth();
   const [orgName, setOrgName] = useState("");
   const [error, setError] = useState<string | null>(null);
+
+  // Redirect users who already have valid organization access
+  useEffect(() => {
+    if (!isLoading && hasValidOrg === true) {
+      navigate("/", { replace: true });
+    }
+  }, [hasValidOrg, isLoading, navigate]);
 
   const handleAcceptInvite = async (token: string) => {
     try {
@@ -74,7 +80,8 @@ export function PostSignupFlow() {
         <div
           className={cn("grid gap-8", {
             "md:grid-cols-2": pendingInvites && pendingInvites.length > 0,
-            "max-w-md mx-auto w-full": !pendingInvites || pendingInvites.length === 0,
+            "max-w-md mx-auto w-full":
+              !pendingInvites || pendingInvites.length === 0,
           })}
         >
           <Card
@@ -163,7 +170,9 @@ export function PostSignupFlow() {
                           className="w-full"
                           disabled={isAcceptingInvite}
                         >
-                          {isAcceptingInvite && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+                          {isAcceptingInvite && (
+                            <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                          )}
                           Accept Invite
                         </Button>
                       </CardContent>

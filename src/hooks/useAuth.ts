@@ -31,11 +31,19 @@ export function useAuth() {
     staleTime: 1000 * 60 * 10, // 10 minutes - profiles don't change often
   });
 
-  // Get current organization
+  // Check if user has valid organization access
+  const { data: hasValidOrg, isLoading: isLoadingOrgCheck } = useQuery({
+    queryKey: ["hasValidOrg", user?.id],
+    queryFn: () => userService.hasValidOrganization(user?.id),
+    enabled: !!user,
+    staleTime: 1000 * 60 * 2, // 2 minutes - check more frequently
+  });
+
+  // Get current organization - only if user has valid org access
   const { data: currentOrganization, isLoading: isLoadingOrg } = useQuery({
     queryKey: ["currentOrganization", user?.id],
     queryFn: () => organizationService.getCurrentOrganization(user?.id!),
-    enabled: !!user,
+    enabled: !!user && hasValidOrg === true,
     staleTime: 1000 * 60 * 5, // 5 minutes - organization changes are less frequent
     retry: 1, // Don't retry too much on failure
   });
@@ -117,12 +125,18 @@ export function useAuth() {
     isLoadingUser ||
     isLoadingProfile ||
     isLoadingOrg ||
+    isLoadingOrgCheck ||
     isLoadingPendingInvites;
+
+  // Helper to determine if user needs to go to post-signup
+  const needsOrganization = user && hasValidOrg === false;
 
   return {
     user,
     profile,
     currentOrganization,
+    hasValidOrg,
+    needsOrganization,
     signIn: signIn.mutate,
     signUp: signUp.mutate,
     signOut: signOut.mutate,

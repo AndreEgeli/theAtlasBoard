@@ -7,13 +7,30 @@ import { Organization } from "@/types";
 const organizationService = new OrganizationService();
 const userService = new UserService();
 
-// Query Hooks
 export function useUserOrganizations() {
   const { user } = useAuth();
   return useQuery({
     queryKey: ["organizations", user?.id],
     queryFn: () => organizationService.getUserOrganizations(user?.id!),
     enabled: !!user?.id,
+  });
+}
+
+export function useSetActiveOrganization() {
+  const queryClient = useQueryClient();
+  const { user } = useAuth();
+
+  return useMutation({
+    mutationFn: (organizationId: string) =>
+      organizationService.setActiveOrganization(organizationId),
+    onSuccess: () => {
+      // Invalidate relevant queries
+      queryClient.invalidateQueries({
+        queryKey: ["currentOrganization", user?.id],
+      });
+      queryClient.invalidateQueries({ queryKey: ["hasValidOrg", user?.id] });
+      queryClient.invalidateQueries({ queryKey: ["profile", user?.id] });
+    },
   });
 }
 

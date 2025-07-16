@@ -22,7 +22,7 @@ export const queryClient = new QueryClient({
 });
 
 function ProtectedRoute({ children }: { children: React.ReactNode }) {
-  const { user, isLoading } = useAuth();
+  const { user, isLoading, needsOrganization } = useAuth();
 
   if (isLoading) {
     return (
@@ -37,6 +37,10 @@ function ProtectedRoute({ children }: { children: React.ReactNode }) {
 
   if (!user) {
     return <Navigate to="/login" replace />;
+  }
+
+  if (needsOrganization) {
+    return <Navigate to="/post-signup" replace />;
   }
 
   return <>{children}</>;

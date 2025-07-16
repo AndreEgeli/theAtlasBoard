@@ -56,7 +56,7 @@ export class UserService {
     return user;
   }
 
-  async checkUserOrganizations(userId: string | undefined) {
+  async hasValidOrganization(userId: string | undefined) {
     if (!userId) return false;
 
     const { data: user, error: userError } = await supabase
@@ -65,20 +65,30 @@ export class UserService {
       .eq("id", userId)
       .single();
 
-    if (userError) throw userError;
+    if (userError) return false;
 
     if (user?.active_organization_id) {
-      return true;
+      // Verify the user still has access to this organization
+      const { data: membership, error: membershipError } = await supabase
+        .from("organization_members")
+        .select("id")
+        .eq("user_id", userId)
+        .eq("organization_id", user.active_organization_id)
+        .single();
+
+      if (!membershipError && membership) {
+        return true;
+      }
     }
 
-    // If no active org, check if user has any org memberships
+    // If no active org or no access, check if user has any org memberships
     const { data: orgMemberships, error: orgError } = await supabase
       .from("organization_members")
       .select("organization_id")
       .eq("user_id", userId)
       .limit(1);
 
-    if (orgError) throw orgError;
+    if (orgError) return false;
     return orgMemberships && orgMemberships.length > 0;
   }
 

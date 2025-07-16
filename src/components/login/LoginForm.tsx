@@ -80,7 +80,11 @@ export default function LoginForm() {
                 </div>
               </div>
 
-              <Button type="submit" className="w-full mt-6" disabled={isSigningIn}>
+              <Button
+                type="submit"
+                className="w-full mt-6"
+                disabled={isSigningIn}
+              >
                 {isSigningIn ? "Signing in..." : "Sign in"}
               </Button>
             </form>
@@ -110,7 +114,7 @@ export default function LoginForm() {
                     required
                     placeholder="Email address"
                     value={email}
-                    onChange={(e) => setEmail(e.targe.value)}
+                    onChange={(e) => setEmail(e.target.value)}
                     disabled={isSigningUp}
                   />
                 </div>
@@ -129,7 +133,11 @@ export default function LoginForm() {
                 </div>
               </div>
 
-              <Button type="submit" className="w-full mt-6" disabled={isSigningUp}>
+              <Button
+                type="submit"
+                className="w-full mt-6"
+                disabled={isSigningUp}
+              >
                 {isSigningUp ? "Creating account..." : "Sign up"}
               </Button>
             </form>
