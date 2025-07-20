@@ -10,33 +10,38 @@ interface StatusTransition {
   title: string;
 }
 
-export const TASK_STATUSES = {
+export const TASK_STATUSES: Record<Task["status"], StatusTransition> = {
   pending: {
     icon: Play,
+    title: "Start the task",
     label: "Pending",
     color: "gray",
     nextStatus: "started" as const,
   },
   started: {
     icon: Play,
+    title: "Start the task",
     label: "In Progress",
     color: "blue",
     nextStatus: "in_review" as const,
   },
   in_review: {
     icon: Send,
+    title: "Start the task",
     label: "In Review",
     color: "orange",
     nextStatus: "completed" as const,
   },
   completed: {
     icon: Check,
+    title: "Start the task",
     label: "Completed",
     color: "green",
     nextStatus: "archived" as const,
   },
   archived: {
     icon: Archive,
+    title: "Start the task",
     label: "Archived",
     color: "gray",
     nextStatus: "archived" as const,

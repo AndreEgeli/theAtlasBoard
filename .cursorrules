@@ -1,0 +1,33 @@
+# Cursor Rules
+
+## Database and Package Management
+
+- NEVER run supabase commands (supabase db reset, supabase start, etc.)
+- NEVER run pnpm commands (pnpm install, pnpm dev, etc.)
+- NEVER run npm commands
+- NEVER run test scripts or build commands
+- These commands can disrupt the user's development environment
+
+## Migration Management
+
+- ALWAYS consolidate all migrations into the initial migration file
+- NEVER create separate migration files for related changes
+- Design schema correctly from the start to avoid dropping and recreating constraints
+
+## Hook Design
+
+- Create focused hooks for single entity operations (e.g., useTask for individual tasks)
+- Avoid over-engineered hooks that expose too many methods for simple use cases
+- Use existing cached data when possible instead of refetching
+
+## Documentation
+
+- NEVER write summaries inside markdown files
+- Keep documentation minimal and inline with code when necessary
+
+## Code Analysis Only
+
+- Focus on code analysis, reading files, and making targeted edits
+- Use grep_search and codebase_search for investigation
+- Read files to understand the codebase structure
+- Make precise code changes when needed
